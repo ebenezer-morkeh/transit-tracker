@@ -6,10 +6,10 @@ Spec: `.scratch/transit-tracker-v1/spec.md`
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Workflow triggers on `pull_request` and `push` to `main`
-- [ ] Sets up Java 21 (Temurin) with Maven dependency caching
-- [ ] Runs `./mvnw verify`
-- [ ] Workflow YAML passes a syntax check (for example `actionlint`, if available)
-- [ ] Nothing is pushed and no remote is created
+- [x] Workflow triggers on `pull_request` and `push` to `main`
+- [x] Sets up Java 21 (Temurin) with Maven dependency caching
+- [x] Runs `./mvnw verify`
+- [x] Workflow YAML passes a syntax check (for example `actionlint`, if available)
+- [x] Nothing is pushed and no remote is created
