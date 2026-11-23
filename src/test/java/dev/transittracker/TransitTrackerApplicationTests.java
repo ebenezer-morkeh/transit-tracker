@@ -37,7 +37,8 @@ class TransitTrackerApplicationTests {
 
 	@Test
 	void flywayAppliesMigrationsOnStartup() {
-		assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
+		assertThat(flyway.info().current()).isNotNull();
+		assertThat(flyway.info().pending()).isEmpty();
 	}
 
 	@Test
