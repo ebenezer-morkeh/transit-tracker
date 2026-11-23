@@ -22,9 +22,9 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @EnableConfigurationProperties(FeedProperties.class)
-public class VehiclePoller {
+public class FeedPoller {
 
-	private static final Logger log = LoggerFactory.getLogger(VehiclePoller.class);
+	private static final Logger log = LoggerFactory.getLogger(FeedPoller.class);
 
 	private final HttpClient http = HttpClient.newBuilder()
 		.connectTimeout(Duration.ofSeconds(5))
@@ -41,7 +41,7 @@ public class VehiclePoller {
 
 	private final VehicleStream stream;
 
-	VehiclePoller(VehiclePositionStore store, TripDelayStore delays, ScheduleStore schedule, VehicleStream stream,
+	FeedPoller(VehiclePositionStore store, TripDelayStore delays, ScheduleStore schedule, VehicleStream stream,
 			FeedProperties properties) {
 		this.store = store;
 		this.delays = delays;
