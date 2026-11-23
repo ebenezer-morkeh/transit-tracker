@@ -41,7 +41,7 @@ flowchart LR
     Internet(["Internet"]) --> ECS
 ```
 
-A failing feed is logged and skipped; the other agencies are unaffected. Vehicles missing from a successful poll are deleted, so there are no ghost buses.
+A failing feed is logged and skipped; the other agencies are unaffected. A static schedule that fails to download or parse, or has no `stop_times.txt` rows, keeps that agency's previous schedule. Vehicles missing from a successful poll are deleted, so there are no ghost buses.
 
 ## Run it
 
@@ -68,7 +68,7 @@ All responses are JSON. Empty results are `200 []`. Output below is real, trimme
 
 ### `GET /api/vehicles?agency={id}&route={id}`
 
-Both parameters optional. `route` requires `agency` (route IDs are only unique per agency), otherwise `400`. An unknown agency returns `[]`. Agency IDs: `goraleigh`, `godurham`, `gotriangle`, `chapelhill`, `gocary`.
+Both parameters optional. `route` requires `agency` (route IDs are only unique per agency), otherwise `400`; a blank `agency` or `route` (`?agency=&route=1`) is also `400`. An unknown agency returns `[]`. Agency IDs: `goraleigh`, `godurham`, `gotriangle`, `chapelhill`, `gocary`.
 
 ```sh
 curl "localhost:8080/api/vehicles?agency=goraleigh&route=11"
@@ -103,7 +103,7 @@ curl localhost:8080/api/agencies/goraleigh/routes/11/delays
 
 ### `GET /api/vehicles/stream?agency={id}&route={id}`
 
-`text/event-stream`, same optional filters and the same `400` rule. Each event is the filtered vehicle list, pushed right after every poll (about every 15s).
+`text/event-stream`, same optional filters and the same `400` rule. Each event is the filtered vehicle list, pushed right after every poll (about every 15s) in which at least one agency's vehicle feed succeeded.
 
 ```sh
 curl -N "localhost:8080/api/vehicles/stream?agency=gotriangle"
@@ -120,7 +120,7 @@ data:[{"agencyId":"gotriangle","vehicleId":"07f4a4fb-...","tripId":"81309c30-...
 
 ## How delays are computed
 
-Per trip, from the next upcoming stop in its trip update (arrival, else departure):
+Per trip, from the next upcoming stop in its trip update: the first stop whose event (arrival if it has a time or delay, else departure) has no time (some feeds list only future stops, with a delay) or a time at or after the feed timestamp. If every listed stop has passed, only the trip-level delay is used:
 
 1. If the feed sends `delay`, use it.
 2. Otherwise `delay = predicted time - scheduled time`. The scheduled time comes from the static GTFS `stop_times.txt` (matched by agency + trip ID + stop sequence, else stop ID): the service date at "noon minus 12 hours" local time (the GTFS definition, correct on DST change days) plus the GTFS time, which can exceed 24:00:00.
@@ -140,7 +140,7 @@ Static schedules are downloaded at startup and daily; a failed download keeps th
 
 ## Infrastructure: written, not applied, $0
 
-`infra/` contains Terraform (us-east-1) for ECR, an ECS Fargate service, RDS Postgres, CloudWatch logs and an alarm, and a GitHub OIDC deploy role. `.github/workflows/deploy.yml` deploys on merge to `main` and skips itself until the `AWS_ROLE_ARN` repository variable is set.
+`infra/` contains Terraform (us-east-1) for ECR, an ECS Fargate service, RDS Postgres, CloudWatch logs and an alarm, and a GitHub OIDC deploy role. `.github/workflows/deploy.yml` deploys on merge to `main` and skips itself until the `AWS_ROLE_ARN` repository variable is set. Region and resource names come from repository variables (`AWS_REGION`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`, `TASK_FAMILY`, `CONTAINER_NAME`) with the Terraform defaults as fallbacks; see `infra/README.md`.
 
 **Nothing has ever been applied.** CI only runs `terraform fmt -check` and `terraform validate`, which need no AWS account, so the project costs $0. The consequence: the IAM policies and the deploy workflow are validated syntactically but unverified against real AWS.
 
