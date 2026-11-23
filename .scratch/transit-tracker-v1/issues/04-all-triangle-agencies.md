@@ -6,13 +6,13 @@ Spec: `.scratch/transit-tracker-v1/spec.md`
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] All five agencies configured; adding an agency requires only a config entry
-- [ ] Feeds fetched in parallel with a per-request timeout
-- [ ] `agency` and `route` filters work; route without agency returns 400; unknown agency returns `[]`
-- [ ] End-to-end test: two stubbed agencies sharing a route ID don't collide
-- [ ] End-to-end test: one stubbed feed returns HTTP 500 / garbage bytes and the other agency's data is still saved and served
-- [ ] End-to-end test: a vehicle missing from the next poll disappears from results
-- [ ] Logs show per-agency poll outcome (count saved or failure reason)
-- [ ] Running locally against live feeds shows vehicles from all five agencies
+- [x] All five agencies configured; adding an agency requires only a config entry
+- [x] Feeds fetched in parallel with a per-request timeout
+- [x] `agency` and `route` filters work; route without agency returns 400; unknown agency returns `[]`
+- [x] End-to-end test: two stubbed agencies sharing a route ID don't collide
+- [x] End-to-end test: one stubbed feed returns HTTP 500 / garbage bytes and the other agency's data is still saved and served
+- [x] End-to-end test: a vehicle missing from the next poll disappears from results
+- [x] Logs show per-agency poll outcome (count saved or failure reason)
+- [x] Running locally against live feeds shows vehicles from all five agencies
