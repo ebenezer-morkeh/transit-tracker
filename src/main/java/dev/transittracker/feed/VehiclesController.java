@@ -34,6 +34,9 @@ class VehiclesController {
 	}
 
 	private static void validate(String agency, String route) {
+		if ((agency != null && agency.isBlank()) || (route != null && route.isBlank())) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "agency and route must not be blank");
+		}
 		if (route != null && agency == null) {
 			// Route IDs are only unique within an agency.
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "route requires agency");

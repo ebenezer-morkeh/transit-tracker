@@ -12,7 +12,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -21,17 +20,13 @@ import org.springframework.stereotype.Component;
  * saves the result.
  */
 @Component
-@EnableConfigurationProperties(FeedProperties.class)
 public class FeedPoller {
 
 	private static final Logger log = LoggerFactory.getLogger(FeedPoller.class);
 
-	private final HttpClient http = HttpClient.newBuilder()
-		.connectTimeout(Duration.ofSeconds(5))
-		.followRedirects(HttpClient.Redirect.NORMAL)
-		.build();
+	private final HttpClient http = FeedHttp.client(Duration.ofSeconds(5));
 
-	private final VehiclePositionStore store;
+	private final VehiclePositionStore vehicles;
 
 	private final TripDelayStore delays;
 
@@ -41,9 +36,9 @@ public class FeedPoller {
 
 	private final VehicleStream stream;
 
-	FeedPoller(VehiclePositionStore store, TripDelayStore delays, ScheduleStore schedule, VehicleStream stream,
+	FeedPoller(VehiclePositionStore vehicles, TripDelayStore delays, ScheduleStore schedule, VehicleStream stream,
 			FeedProperties properties) {
-		this.store = store;
+		this.vehicles = vehicles;
 		this.delays = delays;
 		this.schedule = schedule;
 		this.stream = stream;
@@ -55,30 +50,38 @@ public class FeedPoller {
 		pollOnce();
 	}
 
-	/** One poll cycle, now. Each feed succeeds or fails (logged) on its own; returns when all are done and stream subscribers are notified. */
+	/**
+	 * One poll cycle, now. Each feed succeeds or fails (logged) on its own; returns when all are done. If any agency's
+	 * vehicles were saved, stream subscribers are then notified in the background.
+	 */
 	public void pollOnce() {
-		List<CompletableFuture<Void>> polls = new ArrayList<>();
+		List<CompletableFuture<Boolean>> vehiclePolls = new ArrayList<>();
+		List<CompletableFuture<Boolean>> tripPolls = new ArrayList<>();
 		for (Feed feed : feeds) {
-			polls.add(poll(feed, feed.vehiclePositionsUrl(), body -> {
+			vehiclePolls.add(poll(feed, feed.vehiclePositionsUrl(), body -> {
 				List<VehiclePosition> positions = FeedParser.parseVehiclePositions(body, feed.agencyId());
-				store.replaceAgency(feed.agencyId(), positions);
+				vehicles.replaceAgency(feed.agencyId(), positions);
 				return "vehicles=" + positions.size();
 			}));
 			if (feed.tripUpdatesUrl() != null) {
-				polls.add(poll(feed, feed.tripUpdatesUrl(), body -> {
+				tripPolls.add(poll(feed, feed.tripUpdatesUrl(), body -> {
 					List<TripPrediction> predictions = FeedParser.parseTripUpdates(body, feed.agencyId());
-					List<TripDelay> found = predictions.stream()
-						.map(p -> TripDelays.resolve(p,
-								x -> schedule.find(x.agencyId(), x.tripId(), x.stopSequence(), x.stopId())))
+					var scheduledStopTime = schedule.forTrips(feed.agencyId(),
+							predictions.stream().map(TripPrediction::tripId).toList());
+					List<TripDelay> tripDelays = predictions.stream()
+						.map(p -> TripDelays.resolve(p, scheduledStopTime))
 						.flatMap(Optional::stream)
 						.toList();
-					delays.replaceAgency(feed.agencyId(), found);
-					return "trips=" + predictions.size() + " delays=" + found.size();
+					delays.replaceAgency(feed.agencyId(), tripDelays);
+					return "trips=" + predictions.size() + " delays=" + tripDelays.size();
 				}));
 			}
 		}
-		CompletableFuture.allOf(polls.toArray(CompletableFuture[]::new)).join();
-		stream.publish();
+		CompletableFuture.allOf(tripPolls.toArray(CompletableFuture[]::new)).join();
+		// toList() waits for every vehicle poll; anyMatch alone would stop at the first success.
+		if (vehiclePolls.stream().map(CompletableFuture::join).toList().contains(true)) {
+			stream.publish();
+		}
 	}
 
 	/** Parses and saves one feed's body; returns what was saved, for the log. */
@@ -88,14 +91,13 @@ public class FeedPoller {
 
 	}
 
-	private CompletableFuture<Void> poll(Feed feed, URI url, FeedHandler handler) {
+	/** Completes with whether the feed was fetched and saved; never exceptionally. */
+	private CompletableFuture<Boolean> poll(Feed feed, URI url, FeedHandler handler) {
 		HttpRequest request = HttpRequest.newBuilder(url).timeout(Duration.ofSeconds(10)).build();
-		return http.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray()).thenAccept(response -> {
-			if (response.statusCode() != 200) {
-				throw new IllegalStateException("HTTP " + response.statusCode());
-			}
+		return http.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray()).thenApply(response -> {
 			try {
-				log.info("Polled agency={} {}", feed.agencyId(), handler.save(response.body()));
+				log.info("Polled agency={} {}", feed.agencyId(), handler.save(FeedHttp.okBody(response)));
+				return true;
 			}
 			catch (Exception e) {
 				throw new IllegalStateException(e);
@@ -106,7 +108,7 @@ public class FeedPoller {
 				cause = cause.getCause();
 			}
 			log.warn("Poll failed agency={} url={} reason={}", feed.agencyId(), url, cause.toString());
-			return null;
+			return false;
 		});
 	}
 
