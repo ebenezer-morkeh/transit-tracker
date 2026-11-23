@@ -12,13 +12,13 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION: us-east-1
-  # Names match the defaults in infra/ (var.name = "transit-tracker").
-  ECR_REPOSITORY: transit-tracker
-  ECS_CLUSTER: transit-tracker
-  ECS_SERVICE: transit-tracker
-  TASK_FAMILY: transit-tracker
-  CONTAINER_NAME: transit-tracker
+  # Repository variables override these; the fallbacks match the defaults in infra/ (var.name = "transit-tracker").
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'transit-tracker' }}
+  ECS_CLUSTER: ${{ vars.ECS_CLUSTER || 'transit-tracker' }}
+  ECS_SERVICE: ${{ vars.ECS_SERVICE || 'transit-tracker' }}
+  TASK_FAMILY: ${{ vars.TASK_FAMILY || 'transit-tracker' }}
+  CONTAINER_NAME: ${{ vars.CONTAINER_NAME || 'transit-tracker' }}
 
 jobs:
   deploy:

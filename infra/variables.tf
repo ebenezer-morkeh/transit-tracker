@@ -5,7 +5,7 @@ variable "region" {
 }
 
 variable "name" {
-  description = "Name prefix for all resources. The deploy workflow assumes the default."
+  description = "Name prefix for all resources. If changed, set the deploy workflow's repository variables (infra/README.md)."
   type        = string
   default     = "transit-tracker"
 }
