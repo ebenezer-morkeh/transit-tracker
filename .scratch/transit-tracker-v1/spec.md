@@ -1,6 +1,6 @@
 # Spec: Transit Tracker v1 (Triangle region, backend only)
 
-Status: ready-for-agent
+Status: done (integration/transit-tracker-v1)
 
 ## Problem Statement
 

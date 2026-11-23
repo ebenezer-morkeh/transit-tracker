@@ -6,11 +6,11 @@ Spec: `.scratch/transit-tracker-v1/spec.md`
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `./mvnw verify` passes locally
-- [ ] App boots against Postgres and `/actuator/health` returns UP
-- [ ] Flyway runs a baseline migration on startup
-- [ ] One Testcontainers integration test boots the full app against real Postgres and asserts health is UP
-- [ ] Boot version decision recorded (4.0.x confirmed, or fallback reason documented)
-- [ ] MIT `LICENSE` file and a `.gitignore` for Maven/IDE files
+- [x] `./mvnw verify` passes locally
+- [x] App boots against Postgres and `/actuator/health` returns UP
+- [x] Flyway runs a baseline migration on startup
+- [x] One Testcontainers integration test boots the full app against real Postgres and asserts health is UP
+- [x] Boot version decision recorded (4.0.x confirmed, or fallback reason documented)
+- [x] MIT `LICENSE` file and a `.gitignore` for Maven/IDE files
