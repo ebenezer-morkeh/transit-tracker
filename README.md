@@ -12,14 +12,14 @@ Interactive API docs: **http://localhost:8080/swagger-ui.html** (OpenAPI JSON at
 
 ## Code layout
 
-Packaged by feature; each feature is controller → service → repository, and only services cross feature boundaries.
+Packaged by feature; each feature is controller → service → repository, and only services cross feature boundaries (enforced by `ArchitectureTests`; see ADR-0005). Review rules: `CODING_STANDARDS.md`; terms: `GLOSSARY.md`; feed quirks: `docs/feeds.md`.
 
 | Package | What's in it |
 |---|---|
 | `ingest` | Feed config, HTTP client, GTFS-realtime parser (pure function), the 15s poller. The poller calls `VehicleService` and `DelayService`, never a repository. |
 | `vehicles` | `VehiclesController` → `VehicleService` → `VehicleRepository`, plus the SSE `VehicleStream`. |
 | `delays` | `DelaysController` → `DelayService` → `TripDelayRepository`, plus `TripDelays`, the pure delay rule. |
-| `schedule` | `ScheduleLoader` (daily static GTFS download), `StopTimesParser`, `ScheduleRepository`. |
+| `schedule` | `ScheduleLoader` (daily static GTFS download), `StopTimesParser`, `ScheduleService` → `ScheduleRepository`. |
 
 Why JDBC and not JPA: the workload is bulk SQL (`INSERT … ON CONFLICT` upserts, "delete what this poll didn't contain", 226k-row batch inserts of the schedule) with no object graph, which JPA handles poorly. Why blocking MVC and not Reactor/WebFlux: 5 feeds every 15s doesn't need a reactive stack; Java 21 virtual threads are the upgrade path if concurrency ever matters.
 

@@ -1,7 +1,7 @@
 package dev.transittracker.delays;
 
 import dev.transittracker.ingest.TripPrediction;
-import dev.transittracker.schedule.ScheduleRepository;
+import dev.transittracker.schedule.ScheduleService;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -12,9 +12,9 @@ public class DelayService {
 
 	private final TripDelayRepository repository;
 
-	private final ScheduleRepository schedule;
+	private final ScheduleService schedule;
 
-	DelayService(TripDelayRepository repository, ScheduleRepository schedule) {
+	DelayService(TripDelayRepository repository, ScheduleService schedule) {
 		this.repository = repository;
 		this.schedule = schedule;
 	}
