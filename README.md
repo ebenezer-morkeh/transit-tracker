@@ -1,6 +1,6 @@
 # Transit Tracker
 
-![CI](https://github.com/OWNER/transit-tracker/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/ebenezer-morkeh/transit-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/ebenezer-morkeh/transit-tracker/actions/workflows/ci.yml)
 
 A Spring Boot service that polls the GTFS-realtime feeds of five Triangle (NC) transit agencies every 15 seconds and serves live **vehicle positions** and **trip delays** through one agency-aware REST API plus a Server-Sent Events stream.
 
