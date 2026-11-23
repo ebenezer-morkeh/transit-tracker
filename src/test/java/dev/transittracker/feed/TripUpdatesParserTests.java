@@ -26,7 +26,7 @@ class TripUpdatesParserTests {
 	void goRaleighFixtureHasPredictedTimesOnly() throws Exception {
 		List<TripPrediction> trips = FeedParser.parseTripUpdates(fixture("goraleigh-trips.pb"), "goraleigh");
 
-		assertThat(trips).hasSize(114).allSatisfy(t -> assertThat(t.stopDelay()).isNull());
+		assertThat(trips).hasSize(112).allSatisfy(t -> assertThat(t.stopDelay()).isNull());
 		// First stop has only a departure, and it is after the feed timestamp
 		assertThat(trips.getFirst()).isEqualTo(new TripPrediction("goraleigh", "6695010", "21", null,
 				LocalDate.of(2026, 11, 22), 1, "127", Instant.ofEpochSecond(1795401000), true, null, null,
@@ -37,11 +37,11 @@ class TripUpdatesParserTests {
 	void goDurhamFixtureCarriesFeedDelays() throws Exception {
 		List<TripPrediction> trips = FeedParser.parseTripUpdates(fixture("godurham-trips.pb"), "godurham");
 
-		assertThat(trips).hasSize(37);
-		// Its only stop time update is before the trip's timestamp, so it is the fallback "first one"
-		assertThat(trips.getFirst()).isEqualTo(new TripPrediction("godurham", "t7A5-b1781-sl3-v65", "6", "1801",
-				LocalDate.of(2026, 11, 22), 3339, "995952", Instant.ofEpochSecond(1795398498), false, -261, null,
-				Instant.ofEpochSecond(1795399313)));
+		// 17 of 37 trips list only stops already passed and no trip delay, so they are left out
+		assertThat(trips).hasSize(20);
+		assertThat(trips.getFirst()).isEqualTo(new TripPrediction("godurham", "t7EE-b179F-sl3-v65", "6", "1902",
+				LocalDate.of(2026, 11, 22), 1640, "6609", Instant.parse("2026-11-23T02:02:23Z"), false, 303, null,
+				Instant.parse("2026-11-23T02:01:48Z")));
 	}
 
 	@Test
@@ -58,6 +58,45 @@ class TripUpdatesParserTests {
 	}
 
 	@Test
+	void delayOnlyStopsCountAsUpcomingAfterPassedStops() throws Exception {
+		// GoDurham style: passed stops carry times, future stops carry only a delay.
+		byte[] bytes = feed(trip("t", "1").addStopTimeUpdate(arrival(1, 90))
+			.addStopTimeUpdate(StopTimeUpdate.newBuilder()
+				.setStopSequence(2)
+				.setArrival(StopTimeEvent.newBuilder().setDelay(60)))
+			.addStopTimeUpdate(StopTimeUpdate.newBuilder()
+				.setStopSequence(3)
+				.setArrival(StopTimeEvent.newBuilder().setDelay(70))));
+
+		TripPrediction p = FeedParser.parseTripUpdates(bytes, "x").getFirst();
+		assertThat(p.stopSequence()).isEqualTo(2);
+		assertThat(p.stopDelay()).isEqualTo(60);
+		assertThat(p.predictedTime()).isNull();
+	}
+
+	@Test
+	void onlyPassedStopsFallBackToTheTripDelayElseTheTripIsSkipped() throws Exception {
+		byte[] bytes = feed(trip("withDelay", "1").setDelay(30).addStopTimeUpdate(arrival(1, 50))
+			.addStopTimeUpdate(arrival(2, 60)), trip("noDelay", "1").addStopTimeUpdate(arrival(1, 50)));
+
+		assertThat(FeedParser.parseTripUpdates(bytes, "x")).containsExactly(new TripPrediction("x", "withDelay", "1",
+				null, null, null, null, null, false, null, 30, Instant.ofEpochSecond(100)));
+	}
+
+	@Test
+	void emptyArrivalUsesTheDeparture() throws Exception {
+		byte[] bytes = feed(trip("t", "1").addStopTimeUpdate(StopTimeUpdate.newBuilder()
+			.setStopSequence(4)
+			.setArrival(StopTimeEvent.newBuilder())
+			.setDeparture(StopTimeEvent.newBuilder().setTime(150))));
+
+		TripPrediction p = FeedParser.parseTripUpdates(bytes, "x").getFirst();
+		assertThat(p.stopSequence()).isEqualTo(4);
+		assertThat(p.predictedTime()).isEqualTo(Instant.ofEpochSecond(150));
+		assertThat(p.departure()).isTrue();
+	}
+
+	@Test
 	void tripWithNoStopTimeUpdatesKeepsItsTripDelay() throws Exception {
 		byte[] bytes = feed(trip("t", "1").setDelay(42));
 
@@ -67,7 +106,7 @@ class TripUpdatesParserTests {
 
 	@Test
 	void skipsTripsMissingTripIdOrRoute() throws Exception {
-		byte[] bytes = feed(trip("t", ""), trip("", "1"), trip("ok", "1"));
+		byte[] bytes = feed(trip("t", "").setDelay(1), trip("", "1").setDelay(1), trip("ok", "1").setDelay(1));
 
 		assertThat(FeedParser.parseTripUpdates(bytes, "x")).extracting(TripPrediction::tripId).containsExactly("ok");
 	}

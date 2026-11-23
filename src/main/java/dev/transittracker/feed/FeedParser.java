@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Optional;
 
 /** Pure GTFS-realtime parsing: bytes in, records out. No I/O, no Spring. */
 public final class FeedParser {
@@ -25,7 +26,7 @@ public final class FeedParser {
 		return feed.getEntityList()
 			.stream()
 			.filter(FeedParser::hasVehicleIdAndPosition)
-			.map(e -> toRecord(e.getVehicle(), agencyId, headerTimestamp))
+			.map(e -> toVehiclePosition(e.getVehicle(), agencyId, headerTimestamp))
 			.toList();
 	}
 
@@ -34,7 +35,7 @@ public final class FeedParser {
 		return e.hasVehicle() && e.getVehicle().hasPosition() && !e.getVehicle().getVehicle().getId().isEmpty();
 	}
 
-	private static VehiclePosition toRecord(com.google.transit.realtime.GtfsRealtime.VehiclePosition v,
+	private static VehiclePosition toVehiclePosition(com.google.transit.realtime.GtfsRealtime.VehiclePosition v,
 			String agencyId, long headerTimestamp) {
 		var trip = v.getTrip();
 		var pos = v.getPosition();
@@ -46,8 +47,9 @@ public final class FeedParser {
 
 	/**
 	 * One {@link TripPrediction} per trip update with a trip and route ID, built from its next upcoming stop time
-	 * update: the first (skipped and no-data stops aside) whose predicted time is at or after the feed timestamp, else
-	 * the first one.
+	 * update: the first (skipped and no-data stops aside) whose event has no time (feeds list only future stops) or a
+	 * time at or after the feed timestamp. A trip with no upcoming stop keeps only its trip-level delay, and is left out
+	 * when it has none.
 	 */
 	public static List<TripPrediction> parseTripUpdates(byte[] bytes, String agencyId)
 			throws InvalidProtocolBufferException {
@@ -58,37 +60,43 @@ public final class FeedParser {
 			.filter(e -> e.hasTripUpdate() && !e.getTripUpdate().getTrip().getTripId().isEmpty()
 					&& !e.getTripUpdate().getTrip().getRouteId().isEmpty())
 			.map(e -> toPrediction(e.getTripUpdate(), agencyId, headerTimestamp))
+			.flatMap(Optional::stream)
 			.toList();
 	}
 
-	private static TripPrediction toPrediction(TripUpdate u, String agencyId, long headerTimestamp) {
+	private static Optional<TripPrediction> toPrediction(TripUpdate u, String agencyId, long headerTimestamp) {
 		long timestamp = u.hasTimestamp() ? u.getTimestamp() : headerTimestamp;
-		List<StopTimeUpdate> stops = u.getStopTimeUpdateList()
+		StopTimeUpdate next = u.getStopTimeUpdateList()
 			.stream()
 			.filter(s -> s.getScheduleRelationship() != StopTimeUpdate.ScheduleRelationship.SKIPPED
 					&& s.getScheduleRelationship() != StopTimeUpdate.ScheduleRelationship.NO_DATA)
-			.toList();
-		StopTimeUpdate next = stops.stream()
-			.filter(s -> event(s).hasTime() && event(s).getTime() >= timestamp)
+			.filter(s -> !event(s).hasTime() || event(s).getTime() >= timestamp)
 			.findFirst()
-			.orElse(stops.isEmpty() ? null : stops.getFirst());
+			.orElse(null);
 		var trip = u.getTrip();
 		Integer tripDelay = u.hasDelay() ? u.getDelay() : null;
 		Instant feedTimestamp = Instant.ofEpochSecond(timestamp);
 		String vehicleId = emptyToNull(u.getVehicle().getId());
 		if (next == null) {
-			return new TripPrediction(agencyId, trip.getTripId(), trip.getRouteId(), vehicleId,
-					startDate(trip.getStartDate()), null, null, null, false, null, tripDelay, feedTimestamp);
+			return tripDelay == null ? Optional.empty()
+					: Optional.of(new TripPrediction(agencyId, trip.getTripId(), trip.getRouteId(), vehicleId,
+							startDate(trip.getStartDate()), null, null, null, false, null, tripDelay, feedTimestamp));
 		}
 		StopTimeEvent event = event(next);
-		return new TripPrediction(agencyId, trip.getTripId(), trip.getRouteId(), vehicleId,
+		boolean departure = !hasTimeOrDelay(next.getArrival());
+		return Optional.of(new TripPrediction(agencyId, trip.getTripId(), trip.getRouteId(), vehicleId,
 				startDate(trip.getStartDate()), next.hasStopSequence() ? next.getStopSequence() : null,
 				emptyToNull(next.getStopId()), event.hasTime() ? Instant.ofEpochSecond(event.getTime()) : null,
-				!next.hasArrival(), event.hasDelay() ? event.getDelay() : null, tripDelay, feedTimestamp);
+				departure, event.hasDelay() ? event.getDelay() : null, tripDelay, feedTimestamp));
 	}
 
+	/** The arrival if it has a time or delay, else the departure. */
 	private static StopTimeEvent event(StopTimeUpdate s) {
-		return s.hasArrival() ? s.getArrival() : s.getDeparture();
+		return hasTimeOrDelay(s.getArrival()) ? s.getArrival() : s.getDeparture();
+	}
+
+	private static boolean hasTimeOrDelay(StopTimeEvent e) {
+		return e.hasTime() || e.hasDelay();
 	}
 
 	private static LocalDate startDate(String yyyymmdd) {

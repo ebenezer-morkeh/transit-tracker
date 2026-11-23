@@ -19,7 +19,7 @@ import com.google.transit.realtime.GtfsRealtime.TripDescriptor;
 import com.google.transit.realtime.GtfsRealtime.VehicleDescriptor;
 import com.google.transit.realtime.GtfsRealtime.VehiclePosition;
 import com.sun.net.httpserver.HttpServer;
-import dev.transittracker.feed.VehiclePoller;
+import dev.transittracker.feed.FeedPoller;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Instant;
@@ -56,7 +56,7 @@ class VehiclesApiTests {
 	MockMvc mvc;
 
 	@Autowired
-	VehiclePoller poller;
+	FeedPoller poller;
 
 	static HttpServer startFeedServer() {
 		try {
