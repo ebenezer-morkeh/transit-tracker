@@ -19,14 +19,6 @@ public class VehiclePositionStore {
 	/** Saves an agency's latest poll and removes its vehicles that were not in it (ghosts). */
 	@Transactional
 	public void replaceAgency(String agencyId, List<VehiclePosition> positions) {
-		upsert(positions);
-		jdbc.sql("DELETE FROM vehicle_position WHERE agency_id = ? AND vehicle_id <> ALL (?)")
-			.params(agencyId, positions.stream().map(VehiclePosition::vehicleId).toArray(String[]::new))
-			.update();
-	}
-
-	@Transactional
-	public void upsert(List<VehiclePosition> positions) {
 		for (VehiclePosition p : positions) {
 			jdbc.sql("""
 					INSERT INTO vehicle_position (agency_id, vehicle_id, trip_id, route_id, latitude, longitude,
@@ -42,6 +34,9 @@ public class VehiclePositionStore {
 						p.speed(), Timestamp.from(p.feedTimestamp()))
 				.update();
 		}
+		jdbc.sql("DELETE FROM vehicle_position WHERE agency_id = ? AND vehicle_id <> ALL (?)")
+			.params(agencyId, positions.stream().map(VehiclePosition::vehicleId).toArray(String[]::new))
+			.update();
 	}
 
 	/** {@code agencyId} and {@code routeId} are optional (null means no filter). */

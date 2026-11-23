@@ -1,8 +1,12 @@
 package dev.transittracker.feed;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -11,10 +15,16 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Component
 public class VehicleStream {
 
-	private record Subscriber(SseEmitter emitter, String agencyId, String routeId) {
+	private record Filter(String agencyId, String routeId) {
+	}
+
+	private record Subscriber(SseEmitter emitter, Filter filter) {
 	}
 
 	private final List<Subscriber> subscribers = new CopyOnWriteArrayList<>();
+
+	// One thread: publishes run in order and never send to an emitter concurrently. Virtual, so it never blocks JVM exit.
+	private final ExecutorService publisher = Executors.newSingleThreadExecutor(Thread.ofVirtual().factory());
 
 	private final VehiclePositionStore store;
 
@@ -25,7 +35,7 @@ public class VehicleStream {
 	/** {@code agencyId} and {@code routeId} are optional, as in {@link VehiclePositionStore#find}. */
 	public SseEmitter subscribe(String agencyId, String routeId) {
 		SseEmitter emitter = new SseEmitter(0L); // no timeout; dead clients are dropped when a send fails
-		Subscriber subscriber = new Subscriber(emitter, agencyId, routeId);
+		Subscriber subscriber = new Subscriber(emitter, new Filter(agencyId, routeId));
 		subscribers.add(subscriber);
 		emitter.onCompletion(() -> subscribers.remove(subscriber));
 		emitter.onTimeout(() -> subscribers.remove(subscriber));
@@ -33,11 +43,18 @@ public class VehicleStream {
 		return emitter;
 	}
 
-	/** Called by the poller after each cycle. */
+	/** Called by the poller after each cycle; returns at once and sends in the background. */
 	public void publish() {
+		publisher.execute(this::send);
+	}
+
+	private void send() {
+		Map<Filter, List<VehiclePosition>> vehiclesByFilter = new HashMap<>();
 		for (Subscriber s : subscribers) {
+			List<VehiclePosition> vehicles = vehiclesByFilter.computeIfAbsent(s.filter(),
+					f -> store.find(f.agencyId(), f.routeId()));
 			try {
-				s.emitter().send(SseEmitter.event().data(store.find(s.agencyId(), s.routeId()), MediaType.APPLICATION_JSON));
+				s.emitter().send(SseEmitter.event().data(vehicles, MediaType.APPLICATION_JSON));
 			}
 			catch (IOException | IllegalStateException e) {
 				// Client went away (or emitter already completed): forget it.
