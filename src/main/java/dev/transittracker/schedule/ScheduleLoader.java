@@ -1,6 +1,9 @@
-package dev.transittracker.feed;
+package dev.transittracker.schedule;
 
-import dev.transittracker.feed.FeedProperties.Feed;
+import dev.transittracker.ingest.FeedHttp;
+import dev.transittracker.ingest.FeedProperties.Feed;
+import dev.transittracker.ingest.FeedProperties;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.http.HttpClient;
@@ -25,11 +28,11 @@ public class ScheduleLoader {
 
 	private final HttpClient http = FeedHttp.client(Duration.ofSeconds(10));
 
-	private final ScheduleStore store;
+	private final ScheduleRepository store;
 
 	private final List<Feed> feeds;
 
-	ScheduleLoader(ScheduleStore store, FeedProperties properties) {
+	ScheduleLoader(ScheduleRepository store, FeedProperties properties) {
 		this.store = store;
 		this.feeds = properties.feeds();
 	}

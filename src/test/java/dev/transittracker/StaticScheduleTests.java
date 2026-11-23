@@ -1,12 +1,13 @@
 package dev.transittracker;
 
+import dev.transittracker.ingest.TripPrediction;
+import dev.transittracker.schedule.ScheduleLoader;
+import dev.transittracker.schedule.ScheduleRepository;
+import dev.transittracker.schedule.ScheduledStopTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sun.net.httpserver.HttpServer;
-import dev.transittracker.feed.ScheduleLoader;
-import dev.transittracker.feed.ScheduleStore;
-import dev.transittracker.feed.ScheduledStopTime;
-import dev.transittracker.feed.TripPrediction;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -41,7 +42,7 @@ class StaticScheduleTests {
 	ScheduleLoader loader;
 
 	@Autowired
-	ScheduleStore schedule;
+	ScheduleRepository schedule;
 
 	static HttpServer start() {
 		try {

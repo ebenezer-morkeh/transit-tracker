@@ -1,4 +1,4 @@
-package dev.transittracker.feed;
+package dev.transittracker.vehicles;
 
 import java.time.Instant;
 

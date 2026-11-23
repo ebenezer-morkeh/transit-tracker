@@ -1,4 +1,4 @@
-package dev.transittracker.feed;
+package dev.transittracker.delays;
 
 import java.time.Instant;
 

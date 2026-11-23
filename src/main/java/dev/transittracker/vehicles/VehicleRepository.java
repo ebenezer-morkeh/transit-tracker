@@ -1,4 +1,4 @@
-package dev.transittracker.feed;
+package dev.transittracker.vehicles;
 
 import java.sql.Timestamp;
 import java.util.List;
@@ -8,17 +8,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Latest state only: one row per (agency, vehicle), updated in place. */
 @Repository
-public class VehiclePositionStore {
+class VehicleRepository {
 
 	private final JdbcClient jdbc;
 
-	VehiclePositionStore(JdbcClient jdbc) {
+	VehicleRepository(JdbcClient jdbc) {
 		this.jdbc = jdbc;
 	}
 
 	/** Saves an agency's latest poll and removes its vehicles that were not in it (ghosts). */
 	@Transactional
-	public void replaceAgency(String agencyId, List<VehiclePosition> positions) {
+	void replaceAgency(String agencyId, List<VehiclePosition> positions) {
 		for (VehiclePosition p : positions) {
 			jdbc.sql("""
 					INSERT INTO vehicle_position (agency_id, vehicle_id, trip_id, route_id, latitude, longitude,
@@ -40,7 +40,7 @@ public class VehiclePositionStore {
 	}
 
 	/** {@code agencyId} and {@code routeId} are optional (null means no filter). */
-	public List<VehiclePosition> find(String agencyId, String routeId) {
+	List<VehiclePosition> find(String agencyId, String routeId) {
 		return jdbc.sql("""
 				SELECT agency_id, vehicle_id, trip_id, route_id, latitude, longitude, bearing, speed, feed_timestamp
 				FROM vehicle_position

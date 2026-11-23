@@ -1,4 +1,6 @@
-package dev.transittracker.feed;
+package dev.transittracker.ingest;
+
+import dev.transittracker.vehicles.VehiclePosition;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;

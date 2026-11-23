@@ -1,4 +1,7 @@
-package dev.transittracker.feed;
+package dev.transittracker.ingest;
+
+import dev.transittracker.ingest.FeedProperties.Feed;
+import dev.transittracker.schedule.ScheduleLoader;
 
 import java.net.URI;
 import java.util.List;

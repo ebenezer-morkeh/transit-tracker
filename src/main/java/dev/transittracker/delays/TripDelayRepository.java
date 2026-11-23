@@ -1,4 +1,4 @@
-package dev.transittracker.feed;
+package dev.transittracker.delays;
 
 import java.sql.Timestamp;
 import java.util.List;
@@ -8,17 +8,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Latest state only: one row per (agency, trip), updated in place. */
 @Repository
-public class TripDelayStore {
+class TripDelayRepository {
 
 	private final JdbcClient jdbc;
 
-	TripDelayStore(JdbcClient jdbc) {
+	TripDelayRepository(JdbcClient jdbc) {
 		this.jdbc = jdbc;
 	}
 
 	/** Saves an agency's latest poll and removes its trips that were not in it. */
 	@Transactional
-	public void replaceAgency(String agencyId, List<TripDelay> delays) {
+	void replaceAgency(String agencyId, List<TripDelay> delays) {
 		for (TripDelay d : delays) {
 			jdbc.sql("""
 					INSERT INTO trip_delay (agency_id, trip_id, route_id, vehicle_id, delay_seconds, feed_timestamp, updated_at)
@@ -37,7 +37,7 @@ public class TripDelayStore {
 	}
 
 	/** Most delayed first. */
-	public List<TripDelay> find(String agencyId, String routeId) {
+	List<TripDelay> find(String agencyId, String routeId) {
 		return jdbc.sql("""
 				SELECT agency_id, trip_id, route_id, vehicle_id, delay_seconds, feed_timestamp
 				FROM trip_delay WHERE agency_id = ? AND route_id = ?

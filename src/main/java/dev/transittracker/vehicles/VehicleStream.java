@@ -1,4 +1,4 @@
-package dev.transittracker.feed;
+package dev.transittracker.vehicles;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -13,7 +13,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /** SSE subscribers to the live vehicle list. Each gets its own filtered list after every poll cycle. */
 @Component
-public class VehicleStream {
+class VehicleStream {
 
 	private record Filter(String agencyId, String routeId) {
 	}
@@ -26,14 +26,14 @@ public class VehicleStream {
 	// One thread: publishes run in order and never send to an emitter concurrently. Virtual, so it never blocks JVM exit.
 	private final ExecutorService publisher = Executors.newSingleThreadExecutor(Thread.ofVirtual().factory());
 
-	private final VehiclePositionStore store;
+	private final VehicleRepository repository;
 
-	VehicleStream(VehiclePositionStore store) {
-		this.store = store;
+	VehicleStream(VehicleRepository repository) {
+		this.repository = repository;
 	}
 
-	/** {@code agencyId} and {@code routeId} are optional, as in {@link VehiclePositionStore#find}. */
-	public SseEmitter subscribe(String agencyId, String routeId) {
+	/** {@code agencyId} and {@code routeId} are optional, as in {@link VehicleRepository#find}. */
+	SseEmitter subscribe(String agencyId, String routeId) {
 		SseEmitter emitter = new SseEmitter(0L); // no timeout; dead clients are dropped when a send fails
 		Subscriber subscriber = new Subscriber(emitter, new Filter(agencyId, routeId));
 		subscribers.add(subscriber);
@@ -44,7 +44,7 @@ public class VehicleStream {
 	}
 
 	/** Called by the poller after each cycle; returns at once and sends in the background. */
-	public void publish() {
+	void publish() {
 		publisher.execute(this::send);
 	}
 
@@ -52,7 +52,7 @@ public class VehicleStream {
 		Map<Filter, List<VehiclePosition>> vehiclesByFilter = new HashMap<>();
 		for (Subscriber s : subscribers) {
 			List<VehiclePosition> vehicles = vehiclesByFilter.computeIfAbsent(s.filter(),
-					f -> store.find(f.agencyId(), f.routeId()));
+					f -> repository.find(f.agencyId(), f.routeId()));
 			try {
 				s.emitter().send(SseEmitter.event().data(vehicles, MediaType.APPLICATION_JSON));
 			}

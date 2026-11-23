@@ -1,4 +1,4 @@
-package dev.transittracker.feed;
+package dev.transittracker.schedule;
 
 /**
  * One row of a static GTFS {@code stop_times.txt}. Times are seconds after local midnight of the service day and may

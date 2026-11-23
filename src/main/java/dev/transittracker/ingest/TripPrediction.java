@@ -1,4 +1,7 @@
-package dev.transittracker.feed;
+package dev.transittracker.ingest;
+
+import dev.transittracker.delays.TripDelay;
+import dev.transittracker.delays.TripDelays;
 
 import java.time.Instant;
 import java.time.LocalDate;

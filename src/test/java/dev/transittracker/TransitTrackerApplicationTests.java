@@ -36,6 +36,17 @@ class TransitTrackerApplicationTests {
 	}
 
 	@Test
+	void openApiDocumentsEveryEndpoint() throws Exception {
+		mvc.perform(get("/v3/api-docs"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.info.title").value("Transit Tracker API"))
+			.andExpect(jsonPath("$.paths['/api/vehicles'].get.summary").value("List vehicles in service"))
+			.andExpect(jsonPath("$.paths['/api/vehicles/stream'].get").exists())
+			.andExpect(jsonPath("$.paths['/api/agencies/{agency}/routes/{route}/delays'].get").exists());
+		mvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
+	}
+
+	@Test
 	void flywayAppliesMigrationsOnStartup() {
 		assertThat(flyway.info().current()).isNotNull();
 		assertThat(flyway.info().pending()).isEmpty();

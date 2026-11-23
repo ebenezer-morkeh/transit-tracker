@@ -1,4 +1,6 @@
-package dev.transittracker.feed;
+package dev.transittracker.ingest;
+
+import dev.transittracker.vehicles.VehiclePosition;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.transit.realtime.GtfsRealtime.FeedEntity;
