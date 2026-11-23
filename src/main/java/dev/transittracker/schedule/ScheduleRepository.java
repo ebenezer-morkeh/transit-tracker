@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Static schedule: every agency's scheduled stop times, replaced wholesale per agency. */
 @Repository
-public class ScheduleRepository {
+class ScheduleRepository {
 
 	private static final int INSERT_BATCH_SIZE = 5000;
 

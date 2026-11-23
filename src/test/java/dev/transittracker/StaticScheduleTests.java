@@ -2,7 +2,7 @@ package dev.transittracker;
 
 import dev.transittracker.ingest.TripPrediction;
 import dev.transittracker.schedule.ScheduleLoader;
-import dev.transittracker.schedule.ScheduleRepository;
+import dev.transittracker.schedule.ScheduleService;
 import dev.transittracker.schedule.ScheduledStopTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,7 +42,7 @@ class StaticScheduleTests {
 	ScheduleLoader loader;
 
 	@Autowired
-	ScheduleRepository schedule;
+	ScheduleService schedule;
 
 	static HttpServer start() {
 		try {
