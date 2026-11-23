@@ -1,4 +1,6 @@
-package dev.transittracker.feed;
+package dev.transittracker.ingest;
+
+import dev.transittracker.schedule.ScheduleLoader;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;

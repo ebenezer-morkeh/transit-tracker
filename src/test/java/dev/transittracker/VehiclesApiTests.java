@@ -1,5 +1,7 @@
 package dev.transittracker;
 
+import dev.transittracker.ingest.FeedPoller;
+
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.containsString;
@@ -21,7 +23,6 @@ import com.google.transit.realtime.GtfsRealtime.TripDescriptor;
 import com.google.transit.realtime.GtfsRealtime.VehicleDescriptor;
 import com.google.transit.realtime.GtfsRealtime.VehiclePosition;
 import com.sun.net.httpserver.HttpServer;
-import dev.transittracker.feed.FeedPoller;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Instant;

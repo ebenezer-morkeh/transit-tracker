@@ -1,4 +1,4 @@
-package dev.transittracker.feed;
+package dev.transittracker.ingest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

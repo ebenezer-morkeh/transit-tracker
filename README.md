@@ -6,7 +6,22 @@ A Spring Boot service that polls the GTFS-realtime feeds of five Triangle (NC) t
 
 Agencies: GoRaleigh, GoDurham, GoTriangle, Chapel Hill Transit, GoCary. Each publishes raw protobuf from a different vendor, with overlapping route IDs (GoRaleigh route 1 is not GoDurham route 1). This project normalizes them into one model.
 
-Stack: Java 21, Spring Boot 4.0, Postgres 17 + Flyway, Testcontainers, Docker, GitHub Actions, Terraform (AWS, not applied). Only the latest state is stored, so the database stays small and needs no cleanup job.
+Stack: Java 21, Spring Boot 4.0 (Spring MVC), Spring JDBC (`JdbcClient`), Postgres 17 + Flyway, springdoc OpenAPI, Testcontainers, Docker, GitHub Actions, Terraform (AWS, not applied). Only the latest state is stored, so the database stays small and needs no cleanup job.
+
+Interactive API docs: **http://localhost:8080/swagger-ui.html** (OpenAPI JSON at `/v3/api-docs`).
+
+## Code layout
+
+Packaged by feature; each feature is controller → service → repository, and only services cross feature boundaries.
+
+| Package | What's in it |
+|---|---|
+| `ingest` | Feed config, HTTP client, GTFS-realtime parser (pure function), the 15s poller. The poller calls `VehicleService` and `DelayService`, never a repository. |
+| `vehicles` | `VehiclesController` → `VehicleService` → `VehicleRepository`, plus the SSE `VehicleStream`. |
+| `delays` | `DelaysController` → `DelayService` → `TripDelayRepository`, plus `TripDelays`, the pure delay rule. |
+| `schedule` | `ScheduleLoader` (daily static GTFS download), `StopTimesParser`, `ScheduleRepository`. |
+
+Why JDBC and not JPA: the workload is bulk SQL (`INSERT … ON CONFLICT` upserts, "delete what this poll didn't contain", 226k-row batch inserts of the schedule) with no object graph, which JPA handles poorly. Why blocking MVC and not Reactor/WebFlux: 5 feeds every 15s doesn't need a reactive stack; Java 21 virtual threads are the upgrade path if concurrency ever matters.
 
 ## Architecture
 
@@ -19,9 +34,9 @@ flowchart LR
     RT -->|every 15s, parallel| Poller
     ST -->|startup + daily| Loader["Schedule loader"]
     Poller --> Parser["Feed parser<br/>(pure function)"]
-    Parser --> Store
+    Parser --> Services["Vehicle + delay services"]
     Loader --> PG
-    Store --> PG[("Postgres<br/>latest state")]
+    Services --> PG[("Postgres<br/>latest state")]
     PG --> REST["REST API"]
     Poller -->|after each poll| SSE["SSE stream"]
     PG --> SSE
@@ -82,7 +97,7 @@ curl "localhost:8080/api/vehicles?agency=goraleigh&route=11"
 `tripId`, `routeId`, `bearing` and `speed` are `null` when the feed omits them (Chapel Hill often has no route). `speed` is m/s, `bearing` degrees. `feedTimestamp` is when the vehicle last reported, so compare it to now to spot stale positions. Without filters, the live run returned 64 vehicles across all agencies.
 
 ```sh
-curl -i "localhost:8080/api/vehicles?route=11"    # HTTP/1.1 400 (route without agency)
+curl -i "localhost:8080/api/vehicles?route=11"    # 400 {"title":"Bad Request","status":400,"detail":"route requires agency",...}
 curl "localhost:8080/api/vehicles?agency=nope"    # []
 ```
 

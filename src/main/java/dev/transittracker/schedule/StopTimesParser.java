@@ -1,4 +1,4 @@
-package dev.transittracker.feed;
+package dev.transittracker.schedule;
 
 import java.io.BufferedReader;
 import java.io.IOException;

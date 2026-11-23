@@ -1,4 +1,6 @@
-package dev.transittracker.feed;
+package dev.transittracker.schedule;
+
+import dev.transittracker.ingest.TripPrediction;
 
 import java.io.IOException;
 import java.sql.Types;
@@ -17,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Static schedule: every agency's scheduled stop times, replaced wholesale per agency. */
 @Repository
-public class ScheduleStore {
+public class ScheduleRepository {
 
 	private static final int INSERT_BATCH_SIZE = 5000;
 
@@ -33,7 +35,7 @@ public class ScheduleStore {
 
 	private final JdbcTemplate jdbc;
 
-	ScheduleStore(JdbcTemplate jdbc) {
+	ScheduleRepository(JdbcTemplate jdbc) {
 		this.jdbc = jdbc;
 	}
 

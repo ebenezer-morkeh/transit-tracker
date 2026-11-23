@@ -1,6 +1,10 @@
-package dev.transittracker.feed;
+package dev.transittracker.ingest;
 
-import dev.transittracker.feed.FeedProperties.Feed;
+import dev.transittracker.delays.DelayService;
+import dev.transittracker.ingest.FeedProperties.Feed;
+import dev.transittracker.vehicles.VehiclePosition;
+import dev.transittracker.vehicles.VehicleService;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -8,7 +12,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,22 +29,15 @@ public class FeedPoller {
 
 	private final HttpClient http = FeedHttp.client(Duration.ofSeconds(5));
 
-	private final VehiclePositionStore vehicles;
+	private final VehicleService vehicles;
 
-	private final TripDelayStore delays;
-
-	private final ScheduleStore schedule;
+	private final DelayService delays;
 
 	private final List<Feed> feeds;
 
-	private final VehicleStream stream;
-
-	FeedPoller(VehiclePositionStore vehicles, TripDelayStore delays, ScheduleStore schedule, VehicleStream stream,
-			FeedProperties properties) {
+	FeedPoller(VehicleService vehicles, DelayService delays, FeedProperties properties) {
 		this.vehicles = vehicles;
 		this.delays = delays;
-		this.schedule = schedule;
-		this.stream = stream;
 		this.feeds = properties.feeds();
 	}
 
@@ -66,21 +62,15 @@ public class FeedPoller {
 			if (feed.tripUpdatesUrl() != null) {
 				tripPolls.add(poll(feed, feed.tripUpdatesUrl(), body -> {
 					List<TripPrediction> predictions = FeedParser.parseTripUpdates(body, feed.agencyId());
-					var scheduledStopTime = schedule.forTrips(feed.agencyId(),
-							predictions.stream().map(TripPrediction::tripId).toList());
-					List<TripDelay> tripDelays = predictions.stream()
-						.map(p -> TripDelays.resolve(p, scheduledStopTime))
-						.flatMap(Optional::stream)
-						.toList();
-					delays.replaceAgency(feed.agencyId(), tripDelays);
-					return "trips=" + predictions.size() + " delays=" + tripDelays.size();
+					int saved = delays.replaceAgency(feed.agencyId(), predictions);
+					return "trips=" + predictions.size() + " delays=" + saved;
 				}));
 			}
 		}
 		CompletableFuture.allOf(tripPolls.toArray(CompletableFuture[]::new)).join();
 		// toList() waits for every vehicle poll; anyMatch alone would stop at the first success.
 		if (vehiclePolls.stream().map(CompletableFuture::join).toList().contains(true)) {
-			stream.publish();
+			vehicles.publishUpdates();
 		}
 	}
 

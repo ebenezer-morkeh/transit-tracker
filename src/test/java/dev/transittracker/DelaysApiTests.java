@@ -1,5 +1,8 @@
 package dev.transittracker;
 
+import dev.transittracker.ingest.FeedPoller;
+import dev.transittracker.schedule.ScheduleLoader;
+
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -14,8 +17,6 @@ import com.google.transit.realtime.GtfsRealtime.TripUpdate;
 import com.google.transit.realtime.GtfsRealtime.TripUpdate.StopTimeEvent;
 import com.google.transit.realtime.GtfsRealtime.TripUpdate.StopTimeUpdate;
 import com.sun.net.httpserver.HttpServer;
-import dev.transittracker.feed.ScheduleLoader;
-import dev.transittracker.feed.FeedPoller;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
