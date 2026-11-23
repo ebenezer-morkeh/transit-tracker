@@ -6,6 +6,8 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
+import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
@@ -19,7 +21,7 @@ import com.google.transit.realtime.GtfsRealtime.TripDescriptor;
 import com.google.transit.realtime.GtfsRealtime.VehicleDescriptor;
 import com.google.transit.realtime.GtfsRealtime.VehiclePosition;
 import com.sun.net.httpserver.HttpServer;
-import dev.transittracker.feed.VehiclePoller;
+import dev.transittracker.feed.FeedPoller;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Instant;
@@ -56,7 +58,7 @@ class VehiclesApiTests {
 	MockMvc mvc;
 
 	@Autowired
-	VehiclePoller poller;
+	FeedPoller poller;
 
 	static HttpServer startFeedServer() {
 		try {
@@ -175,6 +177,16 @@ class VehiclesApiTests {
 	}
 
 	@Test
+	void blankAgencyOrRouteIs400() throws Exception {
+		for (String path : new String[] { "/api/vehicles", "/api/vehicles/stream" }) {
+			mvc.perform(get(path).param("agency", "").param("route", "1")).andExpect(status().isBadRequest());
+			mvc.perform(get(path).param("agency", "")).andExpect(status().isBadRequest());
+			mvc.perform(get(path).param("agency", " ")).andExpect(status().isBadRequest());
+			mvc.perform(get(path).param("agency", "goraleigh").param("route", "")).andExpect(status().isBadRequest());
+		}
+	}
+
+	@Test
 	void failingOrGarbageFeedDoesNotAffectOtherAgencies() throws Exception {
 		serve("godurham", feed("200:1"));
 		serve("goraleigh", feed("100:1"));
@@ -219,6 +231,7 @@ class VehiclesApiTests {
 		serve("goraleigh", feed("100:1", "101:2"));
 		serve("godurham", feed("200:1"));
 		poller.pollOnce();
+		await().until(() -> all.getResponse().getContentAsString().contains("\"200\""));
 
 		String raleighEvents = raleigh1.getResponse().getContentAsString();
 		assertThat(raleigh1.getResponse().getContentType(), containsString("text/event-stream"));
@@ -231,7 +244,21 @@ class VehiclesApiTests {
 		raleigh1.getRequest().getAsyncContext().complete();
 		serve("godurham", feed("201:1"));
 		poller.pollOnce();
-		assertThat(all.getResponse().getContentAsString(), containsString("\"201\""));
+		await().until(() -> all.getResponse().getContentAsString().contains("\"201\""));
+	}
+
+	@Test
+	void streamSkipsACycleWhereEveryVehicleFeedFailed() throws Exception {
+		MvcResult all = mvc.perform(get("/api/vehicles/stream")).andExpect(request().asyncStarted()).andReturn();
+
+		feeds.put("/goraleigh/vehicles", new StubResponse(500, new byte[0]));
+		feeds.put("/godurham/vehicles", new StubResponse(500, new byte[0]));
+		poller.pollOnce();
+		serve("goraleigh", feed("300:1"));
+		poller.pollOnce();
+
+		await().until(() -> all.getResponse().getContentAsString().contains("\"300\""));
+		assertThat(all.getResponse().getContentAsString().split("data:").length - 1, is(1));
 	}
 
 }

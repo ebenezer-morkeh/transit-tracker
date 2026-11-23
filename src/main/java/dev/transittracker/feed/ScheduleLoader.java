@@ -1,15 +1,17 @@
 package dev.transittracker.feed;
 
 import dev.transittracker.feed.FeedProperties.Feed;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
+import java.util.zip.ZipFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -21,10 +23,7 @@ public class ScheduleLoader {
 
 	private static final Logger log = LoggerFactory.getLogger(ScheduleLoader.class);
 
-	private final HttpClient http = HttpClient.newBuilder()
-		.connectTimeout(Duration.ofSeconds(10))
-		.followRedirects(HttpClient.Redirect.NORMAL)
-		.build();
+	private final HttpClient http = FeedHttp.client(Duration.ofSeconds(10));
 
 	private final ScheduleStore store;
 
@@ -52,22 +51,22 @@ public class ScheduleLoader {
 
 	private void load(Feed feed) {
 		long start = System.nanoTime();
+		Path download = null;
 		try {
+			// To disk, not memory: GoRaleigh's zip is tens of MB.
+			download = Files.createTempFile("gtfs-" + feed.agencyId() + "-", ".zip");
 			HttpRequest request = HttpRequest.newBuilder(feed.staticGtfsUrl()).timeout(Duration.ofSeconds(60)).build();
-			HttpResponse<byte[]> response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
-			if (response.statusCode() != 200) {
-				throw new IllegalStateException("HTTP " + response.statusCode());
-			}
+			Path zipPath = FeedHttp.okBody(http.send(request, HttpResponse.BodyHandlers.ofFile(download)));
 			int rows = store.replaceAgency(feed.agencyId(), sink -> {
-				try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(response.body()))) {
-					for (ZipEntry e = zip.getNextEntry(); e != null; e = zip.getNextEntry()) {
-						if (e.getName().equals("stop_times.txt") || e.getName().endsWith("/stop_times.txt")) {
-							StopTimesParser.parse(zip, sink);
-							return;
-						}
+				try (ZipFile zip = new ZipFile(zipPath.toFile())) {
+					ZipEntry stopTimes = zip.stream()
+						.filter(e -> e.getName().equals("stop_times.txt") || e.getName().endsWith("/stop_times.txt"))
+						.findFirst()
+						.orElseThrow(() -> new IllegalStateException("zip has no stop_times.txt"));
+					try (InputStream in = zip.getInputStream(stopTimes)) {
+						StopTimesParser.parse(in, sink);
 					}
 				}
-				throw new IllegalStateException("zip has no stop_times.txt");
 			});
 			log.info("Loaded schedule agency={} stopTimes={} ms={}", feed.agencyId(), rows,
 					(System.nanoTime() - start) / 1_000_000);
@@ -78,6 +77,21 @@ public class ScheduleLoader {
 		}
 		catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
+		}
+		finally {
+			deleteQuietly(download);
+		}
+	}
+
+	private static void deleteQuietly(Path file) {
+		if (file == null) {
+			return;
+		}
+		try {
+			Files.deleteIfExists(file);
+		}
+		catch (IOException e) {
+			log.warn("Could not delete {}: {}", file, e.toString());
 		}
 	}
 
