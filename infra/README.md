@@ -20,9 +20,9 @@ About **$15–25/month**: Fargate 0.25 vCPU / 0.5 GB (~$9), db.t4g.micro plus 20
 ```sh
 cd infra
 terraform init
-terraform apply -var github_repo=OWNER/transit-tracker
+terraform apply -var github_repo=ebenezer-morkeh/transit-tracker
 # push an image to the ECR repo, then set the repo variable AWS_ROLE_ARN to the github_deploy_role_arn output
-terraform destroy -var github_repo=OWNER/transit-tracker
+terraform destroy -var github_repo=ebenezer-morkeh/transit-tracker
 ```
 
 State is local. To use S3, uncomment the backend block in `versions.tf`.

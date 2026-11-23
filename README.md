@@ -166,8 +166,8 @@ Apply and tear down (details in [infra/README.md](infra/README.md)):
 ```sh
 cd infra
 terraform init
-terraform apply -var github_repo=OWNER/transit-tracker
-terraform destroy -var github_repo=OWNER/transit-tracker
+terraform apply -var github_repo=ebenezer-morkeh/transit-tracker
+terraform destroy -var github_repo=ebenezer-morkeh/transit-tracker
 ```
 
 It is designed for minimum cost, not production. For production, add:
