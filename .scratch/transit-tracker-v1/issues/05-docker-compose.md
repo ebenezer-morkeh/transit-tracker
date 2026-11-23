@@ -6,10 +6,10 @@ Spec: `.scratch/transit-tracker-v1/spec.md`
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Multi-stage Dockerfile builds the app image
-- [ ] `docker-compose.yml` with app + Postgres, Postgres healthcheck, app depends on healthy DB
-- [ ] DB credentials come from compose environment, not hardcoded in the image
-- [ ] `docker compose up` → `/actuator/health` UP and `GET /api/vehicles` returns live data
-- [ ] App can still be run from the IDE against the compose Postgres
+- [x] Multi-stage Dockerfile builds the app image
+- [x] `docker-compose.yml` with app + Postgres, Postgres healthcheck, app depends on healthy DB
+- [x] DB credentials come from compose environment, not hardcoded in the image
+- [x] `docker compose up` → `/actuator/health` UP and `GET /api/vehicles` returns live data
+- [x] App can still be run from the IDE against the compose Postgres

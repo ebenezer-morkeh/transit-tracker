@@ -1,5 +1,7 @@
 # Transit Tracker
 
+Feed quirks (redirects, missing delay fields, TLS, empty feeds): read `docs/feeds.md` before changing `ingest/`, `schedule/` or the feed config.
+
 ## Agent skills
 
 ### Issue tracker

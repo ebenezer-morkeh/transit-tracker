@@ -1,6 +1,6 @@
 # Spec: Transit Tracker v1 (Triangle region, backend only)
 
-Status: ready-for-agent
+Status: done (integration/transit-tracker-v1)
 
 ## Problem Statement
 
@@ -73,7 +73,7 @@ A Spring Boot service that polls all five Triangle agencies' GTFS-realtime feeds
   - `goraleigh`: `https://www.goraleighlive.org/gtfsrt/vehicles`, `https://www.goraleighlive.org/gtfsrt/trips`
   - `godurham`: `https://godurham.rideralerts.com/InfoPoint/GTFS-Realtime.ashx?Type=VehiclePosition`, `...?Type=TripUpdate`
   - `gotriangle`: `https://gotriangle.tripsparkhost.com/gtfs/Realtime/GTFS_VehiclePositions.pb`, `.../GTFS_TripUpdates.pb`
-  - `chapelhill`: `http://mychtransit.org/gtfs-rt/vehiclepositions`, `http://mychtransit.org/gtfs-rt/tripupdates`
+  - `chapelhill`: `https://mychtransit.org/gtfs-rt/vehiclepositions`, `https://mychtransit.org/gtfs-rt/tripupdates`
   - `gocary`: `https://www.gocarylive.org/GTFS/Realtime/GTFS_VehiclePositions.pb`, `https://www.gocarylive.org/GTFS/Realtime/GTFS_TripUpdates.pb`
 - NC State Wolfline is excluded (serves `.json`, not standard protobuf).
 
@@ -87,7 +87,12 @@ A Spring Boot service that polls all five Triangle agencies' GTFS-realtime feeds
 **Data model (latest state only)**
 - `vehicle_position`: agency ID, vehicle ID, trip ID (nullable), route ID (nullable), latitude, longitude, bearing (nullable), speed (nullable), feed timestamp, updated at. Primary key (agency ID, vehicle ID). Index on (agency ID, route ID).
 - `trip_delay`: agency ID, trip ID, route ID, vehicle ID (nullable), delay in seconds, feed timestamp, updated at. Primary key (agency ID, trip ID). Index on (agency ID, route ID).
-- Delay comes from the trip update's next upcoming stop time update (arrival delay, else departure delay), falling back to the trip-level delay if present. Trips without any delay information are skipped.
+- Delay comes from the trip update's next upcoming stop time update: the first whose event (arrival if it has a time or delay, else departure) has no time or a time at or after the feed timestamp; if none qualifies, only the trip-level delay applies. If the event has `delay`, use it. Otherwise compute `delay = predicted time − scheduled time`, where scheduled time comes from the static schedule (matched by agency + trip ID + stop sequence, else stop ID): service date (from the trip's `start_date`, else today in America/New_York) at "noon minus 12h" local time (the GTFS definition, correct on DST change days) plus the GTFS time (which may exceed 24:00:00). Fall back to the trip-level delay if present. Trips with neither are skipped. (Decision 2026-11-22: GoRaleigh and Chapel Hill send only predicted `time`, never `delay`. Measured coverage: goraleigh 0/2074, chapelhill 0/30, gocary 42/183, gotriangle 77/529, godurham 1549/1554.)
+- `scheduled_stop_time` (static schedule, replaced wholesale per agency on each load): agency ID, trip ID, stop sequence, stop ID, arrival seconds, departure seconds (seconds after local midnight of the service day). Primary key (agency ID, trip ID, stop sequence).
+
+**Static schedule (added 2026-11-22)**
+- Each feed config entry gains a static GTFS zip URL. Loaded on startup and refreshed daily. Only `stop_times.txt` is read (trip IDs from realtime matched 100% to static `trips.txt` in all five agencies on 2026-11-22). Load is a streaming CSV parse into a batch insert, replacing that agency's rows in one transaction. A failed download keeps the previous schedule and is logged, never fatal.
+- v1 static URLs (verified 2026-11-22): goraleigh `https://goraleigh.org/gr_gtfs` (~18 MB stop_times), godurham `https://godurham.rideralerts.com/InfoPoint/GTFS-Zip.ashx`, gotriangle `https://gotriangle.org/gtfs`, chapelhill `https://mychtransit.org/gtfs`, gocary `https://gocary.org/wp-content/uploads/gocarygtfs.zip` (the published `https://gocary.org/_GTFS` redirects to plain http, which the client refuses to follow from https, so config uses its https target directly). The others redirect, so follow redirects.
 
 **API contract**
 - `GET /api/vehicles?agency={id}&route={id}`: both parameters optional, and route only makes sense with agency. Returns a JSON array of vehicle positions.
@@ -127,7 +132,7 @@ A Spring Boot service that polls all five Triangle agencies' GTFS-realtime feeds
 ## Out of Scope
 
 - Any frontend (map UI). It's first in "what's next".
-- Static GTFS ingestion (route names, colors, stops, shapes). The API uses raw realtime route IDs.
+- Static GTFS beyond `stop_times.txt` (route names, colors, stops, shapes). The API uses raw realtime route IDs. (`stop_times.txt` is in scope for delay calculation; see Static schedule.)
 - Delay history or analytics. Only the latest state is stored.
 - WebSocket (SSE covers the live stream), service alerts feeds, user accounts, auth, rate limiting.
 - Agencies outside the Triangle, and NC State Wolfline.

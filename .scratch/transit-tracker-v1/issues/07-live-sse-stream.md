@@ -6,9 +6,9 @@ Spec: `.scratch/transit-tracker-v1/spec.md`
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Clients subscribe with optional agency/route filters
-- [ ] Poller notifies subscribers after each cycle; each client gets only its filtered vehicles
-- [ ] Disconnected clients are cleaned up (no leak, no errors on later polls)
-- [ ] End-to-end smoke test: a subscriber gets an event containing stubbed vehicles after a triggered poll
+- [x] Clients subscribe with optional agency/route filters
+- [x] Poller notifies subscribers after each cycle; each client gets only its filtered vehicles
+- [x] Disconnected clients are cleaned up (no leak, no errors on later polls)
+- [x] End-to-end smoke test: a subscriber gets an event containing stubbed vehicles after a triggered poll
