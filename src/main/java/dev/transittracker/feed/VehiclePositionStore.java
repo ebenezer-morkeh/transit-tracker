@@ -16,6 +16,15 @@ public class VehiclePositionStore {
 		this.jdbc = jdbc;
 	}
 
+	/** Saves an agency's latest poll and removes its vehicles that were not in it (ghosts). */
+	@Transactional
+	public void replaceAgency(String agencyId, List<VehiclePosition> positions) {
+		upsert(positions);
+		jdbc.sql("DELETE FROM vehicle_position WHERE agency_id = ? AND vehicle_id <> ALL (?)")
+			.params(agencyId, positions.stream().map(VehiclePosition::vehicleId).toArray(String[]::new))
+			.update();
+	}
+
 	@Transactional
 	public void upsert(List<VehiclePosition> positions) {
 		for (VehiclePosition p : positions) {
@@ -35,11 +44,15 @@ public class VehiclePositionStore {
 		}
 	}
 
-	public List<VehiclePosition> findAll() {
+	/** {@code agencyId} and {@code routeId} are optional (null means no filter). */
+	public List<VehiclePosition> find(String agencyId, String routeId) {
 		return jdbc.sql("""
 				SELECT agency_id, vehicle_id, trip_id, route_id, latitude, longitude, bearing, speed, feed_timestamp
-				FROM vehicle_position ORDER BY agency_id, vehicle_id
+				FROM vehicle_position
+				WHERE (CAST(? AS TEXT) IS NULL OR agency_id = ?) AND (CAST(? AS TEXT) IS NULL OR route_id = ?)
+				ORDER BY agency_id, vehicle_id
 				""")
+			.params(agencyId, agencyId, routeId, routeId)
 			.query((rs, i) -> new VehiclePosition(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
 					rs.getDouble(5), rs.getDouble(6), rs.getObject(7, Float.class), rs.getObject(8, Float.class),
 					rs.getTimestamp(9).toInstant()))
