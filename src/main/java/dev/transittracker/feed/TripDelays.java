@@ -1,0 +1,55 @@
+package dev.transittracker.feed;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.util.Optional;
+import java.util.function.Function;
+
+/** The delay rule (spec, Data model): pure, no I/O. */
+public final class TripDelays {
+
+	/** Every Triangle agency's {@code agency_timezone}. */
+	static final ZoneId ZONE = ZoneId.of("America/New_York");
+
+	private TripDelays() {
+	}
+
+	/**
+	 * Feed stop delay if set, else predicted time minus the scheduled time {@code schedule} finds, else the trip-level
+	 * delay. Empty when there is none of these.
+	 */
+	public static Optional<TripDelay> resolve(TripPrediction p,
+			Function<TripPrediction, Optional<ScheduledStopTime>> schedule) {
+		Integer delay = p.stopDelay();
+		if (delay == null && p.predictedTime() != null) {
+			LocalDate serviceDate = p.startDate() != null ? p.startDate()
+					: LocalDate.ofInstant(p.feedTimestamp(), ZONE);
+			delay = schedule.apply(p)
+				.map(s -> p.departure() && s.departureSeconds() != null ? s.departureSeconds()
+						: s.arrivalSeconds() != null ? s.arrivalSeconds() : s.departureSeconds())
+				.map(seconds -> secondsLate(serviceDate, seconds, p.predictedTime()))
+				.orElse(null);
+		}
+		if (delay == null) {
+			delay = p.tripDelay();
+		}
+		return Optional.ofNullable(delay)
+			.map(d -> new TripDelay(p.agencyId(), p.tripId(), p.routeId(), p.vehicleId(), d, p.feedTimestamp()));
+	}
+
+	/**
+	 * {@code predicted} minus the GTFS time {@code scheduledSeconds} (may exceed 24h) on {@code serviceDate}. GTFS
+	 * measures from noon minus 12h: local midnight, except on DST change days, where it keeps wall-clock times right.
+	 */
+	public static int secondsLate(LocalDate serviceDate, int scheduledSeconds, Instant predicted) {
+		Instant scheduled = serviceDate.atTime(LocalTime.NOON)
+			.atZone(ZONE)
+			.minusHours(12)
+			.plusSeconds(scheduledSeconds)
+			.toInstant();
+		return Math.toIntExact(predicted.getEpochSecond() - scheduled.getEpochSecond());
+	}
+
+}
