@@ -15,7 +15,7 @@ import com.google.transit.realtime.GtfsRealtime.TripUpdate.StopTimeEvent;
 import com.google.transit.realtime.GtfsRealtime.TripUpdate.StopTimeUpdate;
 import com.sun.net.httpserver.HttpServer;
 import dev.transittracker.feed.ScheduleLoader;
-import dev.transittracker.feed.VehiclePoller;
+import dev.transittracker.feed.FeedPoller;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -54,7 +54,7 @@ class DelaysApiTests {
 	MockMvc mvc;
 
 	@Autowired
-	VehiclePoller poller;
+	FeedPoller poller;
 
 	@Autowired
 	ScheduleLoader loader;

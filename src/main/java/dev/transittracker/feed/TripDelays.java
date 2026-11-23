@@ -27,8 +27,7 @@ public final class TripDelays {
 			LocalDate serviceDate = p.startDate() != null ? p.startDate()
 					: LocalDate.ofInstant(p.feedTimestamp(), ZONE);
 			delay = schedule.apply(p)
-				.map(s -> p.departure() && s.departureSeconds() != null ? s.departureSeconds()
-						: s.arrivalSeconds() != null ? s.arrivalSeconds() : s.departureSeconds())
+				.map(s -> scheduledSeconds(p, s))
 				.map(seconds -> secondsLate(serviceDate, seconds, p.predictedTime()))
 				.orElse(null);
 		}
@@ -37,6 +36,14 @@ public final class TripDelays {
 		}
 		return Optional.ofNullable(delay)
 			.map(d -> new TripDelay(p.agencyId(), p.tripId(), p.routeId(), p.vehicleId(), d, p.feedTimestamp()));
+	}
+
+	/** The scheduled time of the prediction's event (departure or arrival), else the other one; null if untimed. */
+	private static Integer scheduledSeconds(TripPrediction prediction, ScheduledStopTime scheduled) {
+		if (prediction.departure() && scheduled.departureSeconds() != null) {
+			return scheduled.departureSeconds();
+		}
+		return scheduled.arrivalSeconds() != null ? scheduled.arrivalSeconds() : scheduled.departureSeconds();
 	}
 
 	/**
