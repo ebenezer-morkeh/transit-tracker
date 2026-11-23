@@ -29,8 +29,11 @@ public class VehiclePoller {
 
 	private final List<Feed> feeds;
 
-	VehiclePoller(VehiclePositionStore store, FeedProperties properties) {
+	private final VehicleStream stream;
+
+	VehiclePoller(VehiclePositionStore store, VehicleStream stream, FeedProperties properties) {
 		this.store = store;
+		this.stream = stream;
 		this.feeds = properties.feeds();
 	}
 
@@ -39,9 +42,10 @@ public class VehiclePoller {
 		pollOnce();
 	}
 
-	/** One poll cycle, now. Each agency succeeds or fails (logged) on its own; returns when all are done. */
+	/** One poll cycle, now. Each agency succeeds or fails (logged) on its own; returns when all are done and stream subscribers are notified. */
 	public void pollOnce() {
 		CompletableFuture.allOf(feeds.stream().map(this::poll).toArray(CompletableFuture[]::new)).join();
+		stream.publish();
 	}
 
 	private CompletableFuture<Void> poll(Feed feed) {

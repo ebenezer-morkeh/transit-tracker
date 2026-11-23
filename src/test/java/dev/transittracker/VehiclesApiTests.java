@@ -1,10 +1,14 @@
 package dev.transittracker;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.closeTo;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.google.transit.realtime.GtfsRealtime.FeedEntity;
@@ -32,6 +36,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
@@ -201,6 +206,32 @@ class VehiclesApiTests {
 		mvc.perform(get("/api/vehicles?agency=goraleigh&route=1"))
 			.andExpect(jsonPath("$[*].agencyId", contains("goraleigh")))
 			.andExpect(jsonPath("$[*].vehicleId", contains("100")));
+	}
+
+	@Test
+	void streamSubscriberGetsItsFilteredVehiclesAfterEachPoll() throws Exception {
+		mvc.perform(get("/api/vehicles/stream?route=1")).andExpect(status().isBadRequest());
+		MvcResult raleigh1 = mvc.perform(get("/api/vehicles/stream?agency=goraleigh&route=1"))
+			.andExpect(request().asyncStarted())
+			.andReturn();
+		MvcResult all = mvc.perform(get("/api/vehicles/stream")).andExpect(request().asyncStarted()).andReturn();
+
+		serve("goraleigh", feed("100:1", "101:2"));
+		serve("godurham", feed("200:1"));
+		poller.pollOnce();
+
+		String raleighEvents = raleigh1.getResponse().getContentAsString();
+		assertThat(raleigh1.getResponse().getContentType(), containsString("text/event-stream"));
+		assertThat(raleighEvents, containsString("data:[{\"agencyId\":\"goraleigh\",\"vehicleId\":\"100\""));
+		assertThat(raleighEvents, not(containsString("\"101\"")));
+		assertThat(raleighEvents, not(containsString("\"200\"")));
+		assertThat(all.getResponse().getContentAsString(), containsString("\"200\""));
+
+		// One client disconnects: later polls still reach the other one.
+		raleigh1.getRequest().getAsyncContext().complete();
+		serve("godurham", feed("201:1"));
+		poller.pollOnce();
+		assertThat(all.getResponse().getContentAsString(), containsString("\"201\""));
 	}
 
 }
