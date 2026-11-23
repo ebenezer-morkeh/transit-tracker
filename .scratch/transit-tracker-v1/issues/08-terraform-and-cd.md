@@ -6,10 +6,10 @@ Spec: `.scratch/transit-tracker-v1/spec.md`
 
 **Blocked by:** 03, 05
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Terraform covers every resource listed above, with variables for region, image tag, and DB credentials (DB password via a sensitive variable or a generated secret, never committed)
-- [ ] `terraform fmt -check` and `terraform init -backend=false && terraform validate` pass locally
-- [ ] CI workflow runs those Terraform checks without AWS credentials
-- [ ] CD workflow: OIDC role assumption, build and push image to ECR, update ECS service; guarded so it skips when `AWS_ROLE_ARN` is unset
-- [ ] No `terraform plan`/`apply` run, no AWS resources created, no AWS credentials used
+- [x] Terraform covers every resource listed above, with variables for region, image tag, and DB credentials (DB password via a sensitive variable or a generated secret, never committed)
+- [x] `terraform fmt -check` and `terraform init -backend=false && terraform validate` pass locally
+- [x] CI workflow runs those Terraform checks without AWS credentials
+- [x] CD workflow: OIDC role assumption, build and push image to ECR, update ECS service; guarded so it skips when `AWS_ROLE_ARN` is unset
+- [x] No `terraform plan`/`apply` run, no AWS resources created, no AWS credentials used
