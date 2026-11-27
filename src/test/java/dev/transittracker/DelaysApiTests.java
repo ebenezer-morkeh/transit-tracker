@@ -17,15 +17,11 @@ import com.google.transit.realtime.GtfsRealtime.TripUpdate;
 import com.google.transit.realtime.GtfsRealtime.TripUpdate.StopTimeEvent;
 import com.google.transit.realtime.GtfsRealtime.TripUpdate.StopTimeUpdate;
 import com.sun.net.httpserver.HttpServer;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -97,14 +93,14 @@ class DelaysApiTests {
 
 	@Test
 	void delaysAreComputedOrTakenFromTheFeedSortedMostDelayedFirst() throws Exception {
-		files.put("/goraleigh/gtfs.zip", gtfsZip("""
+		files.put("/goraleigh/gtfs.zip", StaticScheduleTests.gtfsZip("""
 				trip_id,arrival_time,departure_time,stop_id,stop_sequence
 				T1,20:50:00,20:50:00,S1,1
 				T1,21:00:00,21:00:00,S2,2
 				T2,21:00:00,21:00:00,S1,1
 				T4,21:00:00,21:00:00,S1,1
 				"""));
-		files.put("/godurham/gtfs.zip", gtfsZip("trip_id,arrival_time,departure_time,stop_id,stop_sequence\n"));
+		files.put("/godurham/gtfs.zip", StaticScheduleTests.gtfsZip("trip_id,arrival_time,departure_time,stop_id,stop_sequence\n"));
 		loader.loadNow();
 		files.put("/goraleigh/vehicles", vehicles());
 		files.put("/godurham/vehicles", vehicles());
@@ -164,15 +160,6 @@ class DelaysApiTests {
 
 	static byte[] vehicles() {
 		return trips();
-	}
-
-	static byte[] gtfsZip(String stopTimes) throws IOException {
-		ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-		try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
-			zip.putNextEntry(new ZipEntry("stop_times.txt"));
-			zip.write(stopTimes.getBytes(StandardCharsets.UTF_8));
-		}
-		return bytes.toByteArray();
 	}
 
 }
