@@ -8,7 +8,7 @@ A Spring Boot service that polls the GTFS-realtime feeds of five Triangle (NC) t
 
 Agencies: GoRaleigh, GoDurham, GoTriangle, Chapel Hill Transit, GoCary. Each publishes raw protobuf from a different vendor, with overlapping route IDs (GoRaleigh route 1 is not GoDurham route 1). This project normalizes them into one model.
 
-Stack: Java 21, Spring Boot 4.0 (Spring MVC), Spring JDBC (`JdbcClient`), Postgres 17 + Flyway, springdoc OpenAPI, Testcontainers, Docker, GitHub Actions, Terraform (AWS, not applied). Web app: React 18, TypeScript, Vite, react-leaflet with OpenStreetMap tiles, Vitest. Only the latest state is stored, so the database stays small and needs no cleanup job.
+Stack: Java 21, Spring Boot 4.0 (Spring MVC), Spring JDBC (`JdbcClient`), Postgres 17 + Flyway, springdoc OpenAPI, Testcontainers, Docker, GitHub Actions. Web app: React 18, TypeScript, Vite, react-leaflet with OpenStreetMap tiles, Vitest. Only the latest state is stored, so the database stays small and needs no cleanup job.
 
 Rider web app: **http://localhost:8080/**. Interactive API docs: **http://localhost:8080/swagger-ui.html** (OpenAPI JSON at `/v3/api-docs`).
 
@@ -48,18 +48,6 @@ flowchart LR
     REST --> Web(["Rider web app<br/>(React, same origin)"])
     SSE --> Web
     REST --> Client(["API clients"])
-```
-
-AWS target layout (written in `infra/`, never applied):
-
-```mermaid
-flowchart LR
-    GH["GitHub Actions<br/>(OIDC, no keys)"] -->|push image| ECR
-    GH -->|update service| ECS
-    ECR --> ECS["ECS Fargate task<br/>0.25 vCPU / 0.5 GB<br/>public subnet"]
-    ECS --> RDS[("RDS Postgres 17<br/>db.t4g.micro, single-AZ")]
-    ECS --> CW["CloudWatch logs + alarm"]
-    Internet(["Internet"]) --> ECS
 ```
 
 A failing feed is logged and skipped; the other agencies are unaffected. A static schedule that fails to download or parse, or has an empty routes, stops, trips or stop times file (or both calendar files empty), keeps that agency's previous schedule. An agency whose trip updates haven't polled successfully for 2 minutes shows scheduled times, with a notice. Vehicles missing from a successful poll are deleted, so there are no ghost buses.
@@ -207,33 +195,9 @@ Why the static schedule is needed: most feeds don't send `delay`. Measured on 20
 
 Static schedules are downloaded at startup and daily; a failed download keeps the previous schedule.
 
-## Infrastructure: written, not applied, $0
-
-`infra/` contains Terraform (us-east-1) for ECR, an ECS Fargate service, RDS Postgres, CloudWatch logs and an alarm, and a GitHub OIDC deploy role. `.github/workflows/deploy.yml` deploys on merge to `main` and skips itself until the `AWS_ROLE_ARN` repository variable is set. Region and resource names come from repository variables (`AWS_REGION`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`, `TASK_FAMILY`, `CONTAINER_NAME`) with the Terraform defaults as fallbacks; see `infra/README.md`.
-
-**Nothing has ever been applied.** CI only runs `terraform fmt -check` and `terraform validate`, which need no AWS account, so the project costs $0. The consequence: the IAM policies and the deploy workflow are validated syntactically but unverified against real AWS.
-
-Estimated cost if applied: about **$15-25/month** (Fargate 0.25 vCPU / 0.5 GB ~$9, db.t4g.micro + 20 GB ~$14 less under free tier, public IPv4 ~$3.60, plus small CloudWatch, ECR and Secrets Manager charges).
-
-Apply and tear down (details in [infra/README.md](infra/README.md)):
-
-```sh
-cd infra
-terraform init
-terraform apply -var github_repo=ebenezer-morkeh/transit-tracker
-terraform destroy -var github_repo=ebenezer-morkeh/transit-tracker
-```
-
-It is designed for minimum cost, not production. For production, add:
-
-- an Application Load Balancer with HTTPS in front of two or more tasks (today the task's public IP changes on every deploy)
-- private subnets plus a NAT Gateway (or VPC endpoints) so the tasks aren't publicly addressable
-- Multi-AZ RDS with backups and deletion protection
-- remote Terraform state (S3 + locking; the backend block is commented out in `versions.tf`)
-
 ## What's next
 
-- Public hosting for the rider web app (it runs locally only; see the cost notes above), with a tile provider whose terms allow it
+- Public hosting for the rider web app (it runs locally only, at $0), with a tile provider whose terms allow it
 - Cancelled trips from trip updates, so they drop out of arrivals
 - "Stops near me" from the rider's location
 - Route lines on the map from `shapes.txt`
