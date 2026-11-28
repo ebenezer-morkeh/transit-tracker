@@ -20,7 +20,7 @@ SQL lives in the feature's repository, as set-based statements: upserts with `ON
 
 ## Services
 
-Services own validation and anything that crosses a feature boundary; they stay thin where there is no logic. Errors a client caused become a domain exception in the service and a `ProblemDetail` 400 in the controller.
+Services own validation and anything that crosses a feature boundary; they stay thin where there is no logic. Errors a client caused become a domain exception in the service and a `ProblemDetail` 400 in the controller. An agency's route or stop that doesn't exist is a `NotFoundException`, which one handler turns into a `ProblemDetail` 404.
 
 ## Naming
 

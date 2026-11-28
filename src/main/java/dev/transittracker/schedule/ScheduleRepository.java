@@ -23,7 +23,10 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Static schedule: every agency's routes, stops, trips, service calendars and scheduled stop times, replaced wholesale per agency. */
+/**
+ * Static schedule: every agency's routes, stops, trips, service calendars and scheduled stop times, replaced wholesale
+ * per agency.
+ */
 @Repository
 class ScheduleRepository {
 
@@ -32,6 +35,9 @@ class ScheduleRepository {
 	private static final RowMapper<ScheduledStopTime> STOP_TIME_MAPPER = (rs, i) -> new ScheduledStopTime(
 			rs.getString(1), rs.getInt(2), rs.getString(3), rs.getObject(4, Integer.class),
 			rs.getObject(5, Integer.class));
+
+	private static final RowMapper<Route> ROUTE_MAPPER = (rs, i) -> new Route(rs.getString(1), rs.getString(2),
+			rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6));
 
 	private static final String SELECT_TRIPS_STOP_TIMES = """
 			SELECT trip_id, stop_sequence, stop_id, arrival_seconds, departure_seconds
@@ -74,7 +80,8 @@ class ScheduleRepository {
 
 	/**
 	 * Replaces all of an agency's static GTFS data with {@code gtfs}, in one transaction: if any file throws, the
-	 * agency keeps its previous data, and so it does when routes, stops, trips, stop times or both calendars are empty. Returns the rows read per file.
+	 * agency keeps its previous data, and so it does when routes, stops, trips, stop times or both calendars are empty.
+	 * Returns the rows read per file.
 	 */
 	@Transactional(rollbackFor = Exception.class)
 	public Map<String, Integer> replaceAgency(String agencyId, StaticGtfs gtfs) throws IOException {
@@ -184,8 +191,7 @@ class ScheduleRepository {
 		return jdbc.query("""
 				SELECT agency_id, route_id, short_name, long_name, color, text_color FROM route
 				ORDER BY agency_id, route_id
-				""", (rs, i) -> new Route(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
-				rs.getString(5), rs.getString(6)));
+				""", ROUTE_MAPPER);
 	}
 
 	/** Services running on {@code date}: the calendar's weekday and date range, minus removed dates, plus added dates. */
@@ -201,20 +207,74 @@ class ScheduleRepository {
 				""".formatted(day), String.class, agencyId, date, agencyId, date, agencyId, date));
 	}
 
-	Optional<Stop> stop(String agencyId, String stopId) {
-		return jdbc.query("SELECT stop_id, name, latitude, longitude FROM stop WHERE agency_id = ? AND stop_id = ?",
-				(rs, i) -> new Stop(rs.getString(1), rs.getString(2), rs.getDouble(3), rs.getDouble(4)), agencyId,
-				stopId)
+	Optional<Route> route(String agencyId, String routeId) {
+		return jdbc.query("""
+				SELECT agency_id, route_id, short_name, long_name, color, text_color FROM route
+				WHERE agency_id = ? AND route_id = ?
+				""", ROUTE_MAPPER, agencyId, routeId)
 			.stream()
 			.findFirst();
 	}
 
-	Optional<Trip> trip(String agencyId, String tripId) {
+	/** A route's directions (at most two), by direction ID; see {@link RouteDirection}. */
+	List<RouteDirection> directions(String agencyId, String routeId) {
+		Map<Integer, RouteDirection> byDirection = new LinkedHashMap<>();
+		jdbc.query("""
+				WITH stop_counts AS (
+				    SELECT t.direction_id, t.trip_id, count(*) AS n
+				    FROM trip t JOIN scheduled_stop_time st USING (agency_id, trip_id)
+				    WHERE t.agency_id = ? AND t.route_id = ?
+				    GROUP BY t.direction_id, t.trip_id),
+				longest AS (
+				    SELECT DISTINCT ON (direction_id) direction_id, trip_id FROM stop_counts
+				    ORDER BY direction_id, n DESC, trip_id),
+				headsigns AS (
+				    SELECT DISTINCT ON (direction_id) direction_id, headsign FROM trip
+				    WHERE agency_id = ? AND route_id = ? AND headsign IS NOT NULL
+				    GROUP BY direction_id, headsign
+				    ORDER BY direction_id, count(*) DESC, headsign)
+				SELECT l.direction_id, h.headsign, s.stop_id, s.name, s.latitude, s.longitude
+				FROM longest l
+				LEFT JOIN headsigns h ON h.direction_id IS NOT DISTINCT FROM l.direction_id
+				JOIN scheduled_stop_time st ON st.agency_id = ? AND st.trip_id = l.trip_id
+				JOIN stop s ON s.agency_id = st.agency_id AND s.stop_id = st.stop_id
+				ORDER BY l.direction_id NULLS LAST, st.stop_sequence
+				""", rs -> {
+			Integer direction = rs.getObject(1, Integer.class);
+			String headsign = rs.getString(2);
+			byDirection.computeIfAbsent(direction, d -> new RouteDirection(d, headsign, new ArrayList<>()))
+				.stops()
+				.add(new Stop(rs.getString(3), rs.getString(4), rs.getDouble(5), rs.getDouble(6)));
+		}, agencyId, routeId, agencyId, routeId, agencyId);
+		// Up to two directions: trips without a direction ID only form one when the route has no other.
+		if (byDirection.size() > 1) {
+			byDirection.remove(null);
+		}
+		return List.copyOf(byDirection.values());
+	}
+
+	/** Timed calls at a stop by trips of {@code serviceIds}, scheduled from {@code fromSeconds} to {@code toSeconds}. */
+	List<ScheduledCall> callsAt(String agencyId, String stopId, Set<String> serviceIds, int fromSeconds,
+			int toSeconds) {
 		return jdbc.query("""
-				SELECT trip_id, route_id, service_id, direction_id, headsign FROM trip
-				WHERE agency_id = ? AND trip_id = ?
-				""", (rs, i) -> new Trip(rs.getString(1), rs.getString(2), rs.getString(3),
-				rs.getObject(4, Integer.class), rs.getString(5)), agencyId, tripId)
+				SELECT st.trip_id, t.headsign, r.route_id, r.short_name, r.long_name, r.color, r.text_color,
+				       COALESCE(st.arrival_seconds, st.departure_seconds) AS seconds
+				FROM scheduled_stop_time st
+				JOIN trip t ON t.agency_id = st.agency_id AND t.trip_id = st.trip_id
+				JOIN route r ON r.agency_id = t.agency_id AND r.route_id = t.route_id
+				WHERE st.agency_id = ? AND st.stop_id = ? AND t.service_id = ANY (?)
+				  AND COALESCE(st.arrival_seconds, st.departure_seconds) BETWEEN ? AND ?
+				ORDER BY seconds, st.trip_id
+				""", (rs, i) -> new ScheduledCall(rs.getString(1), rs.getString(2),
+				new Route(agencyId, rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6),
+						rs.getString(7)),
+				rs.getInt(8)), agencyId, stopId, serviceIds.toArray(String[]::new), fromSeconds, toSeconds);
+	}
+
+	Optional<Stop> stop(String agencyId, String stopId) {
+		return jdbc.query("SELECT stop_id, name, latitude, longitude FROM stop WHERE agency_id = ? AND stop_id = ?",
+				(rs, i) -> new Stop(rs.getString(1), rs.getString(2), rs.getDouble(3), rs.getDouble(4)), agencyId,
+				stopId)
 			.stream()
 			.findFirst();
 	}

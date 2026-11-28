@@ -24,7 +24,10 @@ final class GtfsFiles {
 				r.optional("route_color"), r.optional("route_text_color"))));
 	}
 
-	/** Stops and stations; generic nodes and boarding areas (location types 3, 4) have no place a rider waits, so they're skipped. */
+	/**
+	 * Stops and stations; generic nodes and boarding areas (location types 3, 4) have no place a rider waits, so
+	 * they're skipped.
+	 */
 	static void stops(InputStream in, Consumer<Stop> sink) throws IOException {
 		GtfsCsv.read(in, "stops.txt", List.of("stop_id"), r -> {
 			String type = r.optional("location_type");

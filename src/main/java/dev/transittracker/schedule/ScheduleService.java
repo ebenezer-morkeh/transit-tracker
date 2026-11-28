@@ -36,13 +36,29 @@ public class ScheduleService {
 		return repository.stop(agencyId, stopId);
 	}
 
-	public Optional<Trip> trip(String agencyId, String tripId) {
-		return repository.trip(agencyId, tripId);
-	}
-
 	/** Service IDs that run on {@code date} (a service day), from calendar.txt and calendar_dates.txt. */
 	public Set<String> servicesOn(String agencyId, LocalDate date) {
 		return repository.servicesOn(agencyId, date);
+	}
+
+	public Optional<Route> route(String agencyId, String routeId) {
+		return repository.route(agencyId, routeId);
+	}
+
+	/** A route's directions, each with its headsign and ordered stops. */
+	public List<RouteDirection> directions(String agencyId, String routeId) {
+		return repository.directions(agencyId, routeId);
+	}
+
+	/**
+	 * Timed calls at a stop by trips running on {@code serviceDate}, scheduled from {@code fromSeconds} to
+	 * {@code toSeconds} after its reference time. Untimed stop times (no arrival or departure) are left out.
+	 */
+	public List<ScheduledCall> callsAt(String agencyId, String stopId, LocalDate serviceDate, int fromSeconds,
+			int toSeconds) {
+		Set<String> services = repository.servicesOn(agencyId, serviceDate);
+		return services.isEmpty() ? List.of()
+				: repository.callsAt(agencyId, stopId, services, fromSeconds, toSeconds);
 	}
 
 }

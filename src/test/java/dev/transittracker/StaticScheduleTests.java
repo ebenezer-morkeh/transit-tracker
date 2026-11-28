@@ -6,7 +6,7 @@ import dev.transittracker.schedule.ScheduleService;
 import dev.transittracker.schedule.Route;
 import dev.transittracker.schedule.ScheduledStopTime;
 import dev.transittracker.schedule.Stop;
-import dev.transittracker.schedule.Trip;
+import dev.transittracker.schedule.RouteDirection;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -99,7 +99,8 @@ class StaticScheduleTests {
 
 	static final String TRIPS = "route_id,service_id,trip_id\r\n7,DAILY,T1\r\n";
 
-	static final String CALENDAR = "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date\r\n"
+	static final String CALENDAR = "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,"
+			+ "end_date\r\n"
 			+ "DAILY,1,1,1,1,1,1,1,20260101,20271231\r\n";
 
 	/** A zip with {@code stopTimes} and minimal valid routes, stops, trips and calendar files. */
@@ -209,8 +210,11 @@ class StaticScheduleTests {
 				new Route("godurham", "7", "7", "Fayetteville St", null, null));
 		assertThat(schedule.stop("goraleigh", "S1")).contains(new Stop("S1", "Saunders & Tryon", 35.75, -78.65));
 		assertThat(schedule.stop("godurham", "S1")).as("stops are per agency").isEmpty();
-		assertThat(schedule.trip("goraleigh", "T1")).contains(new Trip("T1", "7", "WKDY", 1, "To Crabtree"));
-		assertThat(schedule.trip("godurham", "T1")).contains(new Trip("T1", "7", "DAILY", null, null));
+		// Trips show through their route's directions: direction, headsign and stops.
+		assertThat(schedule.directions("goraleigh", "7"))
+			.containsExactly(new RouteDirection(1, "To Crabtree", List.of(new Stop("S1", "Saunders & Tryon", 35.75, -78.65))));
+		assertThat(schedule.directions("godurham", "7"))
+			.containsExactly(new RouteDirection(null, null, List.of(new Stop("D1", "Durham Station", 35.99, -78.90))));
 	}
 
 	@Test
@@ -272,7 +276,7 @@ class StaticScheduleTests {
 
 			assertThat(schedule.routes()).as(zip.keySet().toString()).contains(route);
 			assertThat(schedule.stop("goraleigh", "S1")).isPresent();
-			assertThat(schedule.trip("goraleigh", "T1")).isPresent();
+			assertThat(schedule.directions("goraleigh", "7")).isNotEmpty();
 			assertThat(schedule.servicesOn("goraleigh", day)).containsExactly("DAILY");
 			assertThat(find("goraleigh", "T1", 1, null)).isPresent();
 		}
