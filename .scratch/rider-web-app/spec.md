@@ -1,6 +1,6 @@
 # Spec: Rider web app
 
-Status: ready-for-agent
+Status: done (integration/transit-tracker-v1)
 
 ## Problem Statement
 

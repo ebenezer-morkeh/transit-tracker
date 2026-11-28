@@ -1,7 +1,10 @@
 package dev.transittracker;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -42,8 +45,19 @@ class TransitTrackerApplicationTests {
 			.andExpect(jsonPath("$.info.title").value("Transit Tracker API"))
 			.andExpect(jsonPath("$.paths['/api/vehicles'].get.summary").value("List vehicles in service"))
 			.andExpect(jsonPath("$.paths['/api/vehicles/stream'].get").exists())
-			.andExpect(jsonPath("$.paths['/api/agencies/{agency}/routes/{route}/delays'].get").exists());
+			.andExpect(jsonPath("$.paths['/api/agencies/{agency}/routes/{route}/delays'].get").exists())
+			.andExpect(jsonPath("$.paths['/api/routes'].get").exists())
+			.andExpect(jsonPath("$.paths['/api/agencies/{agency}/routes/{route}/stops'].get").exists())
+			.andExpect(jsonPath("$.paths['/api/agencies/{agency}/stops/{stop}/arrivals'].get").exists());
 		mvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
+	}
+
+	@Test
+	void theRiderWebAppIsServedAtTheRoot() throws Exception {
+		mvc.perform(get("/")).andExpect(status().isOk()).andExpect(forwardedUrl("index.html"));
+		mvc.perform(get("/index.html"))
+			.andExpect(status().isOk())
+			.andExpect(content().string(containsString("<div id=\"root\"></div>")));
 	}
 
 	@Test

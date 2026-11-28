@@ -1,0 +1,521 @@
+/*
+ * Transit signage: route bullets, a strip map for stops, a departure-board countdown. Everything else stays quiet.
+ * Type: Atkinson Hyperlegible (Braille Institute), for reading at a stop in bright sun.
+ */
+:root {
+  --ground: #eef1f4;
+  --surface: #ffffff;
+  --ink: #1a1f29;
+  --slate: #566070;
+  --rule: #d3d9e0;
+  --signal: #1f4aa8;
+  --signal-ink: #ffffff;
+  --live: #0e7a3e;
+  --notice-bg: #fdf1d8;
+  --notice-ink: #6b4300;
+  --focus: #c2410c;
+  --radius: 10px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #101318;
+    --surface: #191d24;
+    --ink: #eef1f5;
+    --slate: #a9b2bf;
+    --rule: #333a45;
+    --signal: #8fb0f2;
+    --signal-ink: #0d1626;
+    --live: #6bd497;
+    --notice-bg: #3a2c0c;
+    --notice-ink: #ffdc8f;
+    --focus: #ffa66e;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 17px/1.5 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 1.3rem;
+  line-height: 1.25;
+}
+
+h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+/* Header: a plain wordmark, not a colour bar. */
+.site-header {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 16px 4px;
+}
+
+.site-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+.site-header h1 a {
+  color: var(--signal);
+  text-decoration: none;
+}
+
+.site-header p {
+  margin: 2px 0 0;
+  color: var(--slate);
+  font-size: 0.9rem;
+}
+
+.site-footer {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 8px 16px 24px;
+  color: var(--slate);
+  font-size: 0.85rem;
+}
+
+.layout {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.panel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  align-content: start;
+}
+
+section {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 18px 16px;
+}
+
+/* Phones: arrivals, then the map, then the (long) stop list. */
+@media (max-width: 899px) {
+  .layout.with-map .panel {
+    display: contents;
+  }
+
+  .layout.with-map .arrivals {
+    order: 1;
+  }
+
+  .layout.with-map .map-panel {
+    order: 2;
+  }
+
+  .layout.with-map .route-view {
+    order: 3;
+  }
+
+  .layout.with-map .map {
+    height: 40vh;
+  }
+}
+
+@media (min-width: 900px) {
+  .layout.with-map {
+    grid-template-columns: minmax(340px, 440px) 1fr;
+    align-items: start;
+  }
+
+  .layout.with-map .map-panel {
+    position: sticky;
+    top: 16px;
+  }
+
+  .layout.with-map .map {
+    height: calc(100vh - 150px);
+  }
+}
+
+/* Route bullets: the one coloured, signage-like element, reused everywhere a route appears. */
+.route-bullet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 2.1em;
+  height: 2.1em;
+  padding: 0 0.45em;
+  border-radius: 1.05em;
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.agency-tag {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--slate);
+}
+
+/* Home: one picker per agency. */
+.lede {
+  margin: 0 0 16px;
+  color: var(--slate);
+  max-width: 60ch;
+}
+
+.agency-pickers {
+  display: grid;
+  gap: 14px;
+}
+
+@media (min-width: 700px) {
+  .agency-pickers {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+.agency-picker {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.agency-picker select {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  font-weight: 400;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1.5px solid var(--slate);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* Route view */
+.back {
+  min-height: 44px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--signal);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.route-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 16px;
+}
+
+.route-title .route-bullet {
+  font-size: 1.15rem;
+}
+
+.directions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 20px;
+  background: var(--ground);
+  border-radius: 10px;
+}
+
+.directions button {
+  min-height: 48px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--slate);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.directions button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 0 0 1.5px var(--rule);
+}
+
+/* Strip map: stops on a line in the route's colour, as drawn above bus doors. */
+.strip-map {
+  --dot: 14px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.strip-map li {
+  position: relative;
+  padding-left: 34px;
+}
+
+.strip-map li::before {
+  /* the line, running through each stop's dot */
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: var(--route-color);
+}
+
+.strip-map li:first-child::before {
+  top: 50%;
+}
+
+.strip-map li:last-child::before {
+  bottom: 50%;
+}
+
+.strip-map li::after {
+  /* the stop's dot */
+  content: '';
+  position: absolute;
+  left: calc(14px - var(--dot) / 2);
+  top: calc(50% - var(--dot) / 2);
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  background: var(--surface);
+  border: 3px solid var(--route-color);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.strip-map li:has(button[aria-current])::after {
+  --dot: 22px;
+  background: var(--route-color);
+  border-color: var(--surface);
+  box-shadow: 0 0 0 3px var(--route-color);
+}
+
+.strip-map button {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 8px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 6px;
+}
+
+.strip-map button:hover {
+  background: var(--ground);
+}
+
+.strip-map button[aria-current] {
+  font-weight: 700;
+}
+
+/* Arrivals: the departure board. */
+.arrivals {
+  border-top: 6px solid var(--signal);
+}
+
+.arrivals-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 8px;
+}
+
+.arrivals-header h2 {
+  font-size: 1.4rem;
+}
+
+.arrivals-header h2:focus {
+  outline: none;
+}
+
+.close {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 1.6rem;
+  line-height: 1;
+  background: none;
+  border: 1.5px solid var(--rule);
+  border-radius: 50%;
+  color: var(--slate);
+}
+
+.route-arrivals {
+  margin-top: 14px;
+}
+
+.route-arrivals ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.route-arrivals li {
+  display: grid;
+  grid-template-columns: 6.75rem 1fr; /* fits "60 min" at the countdown size */
+  gap: 14px;
+  align-items: baseline;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.route-arrivals li:last-child {
+  border-bottom: none;
+}
+
+.minutes {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail {
+  display: grid;
+  gap: 2px;
+}
+
+.headsign {
+  font-weight: 700;
+}
+
+.when {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 12px;
+  color: var(--slate);
+}
+
+.status.live {
+  color: var(--live);
+  font-weight: 700;
+}
+
+.status.live::before {
+  /* a small signal mark: live data, not decoration */
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 1px;
+}
+
+.notice {
+  margin: 12px 0 0;
+  background: var(--notice-bg);
+  color: var(--notice-ink);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.empty {
+  color: var(--slate);
+}
+
+.updated {
+  margin: 14px 0 0;
+  font-size: 0.85rem;
+  color: var(--slate);
+}
+
+/* Map */
+.map-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.map {
+  height: 50vh;
+  min-height: 280px;
+}
+
+.map-notice {
+  margin: 0;
+  border-radius: 0;
+}
+
+.vehicle-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vehicle-arrow {
+  display: block;
+  color: #ffffff;
+  background: #1a1f29;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+  line-height: 22px;
+  text-align: center;
+}
+
+.vehicle-dot {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #1a1f29;
+  border: 3px solid #ffffff;
+}

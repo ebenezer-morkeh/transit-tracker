@@ -4,6 +4,7 @@ COPY mvnw pom.xml ./
 COPY .mvn .mvn
 RUN ./mvnw -q dependency:go-offline
 COPY src src
+COPY web web
 RUN ./mvnw -q -DskipTests package
 
 FROM eclipse-temurin:21-jre

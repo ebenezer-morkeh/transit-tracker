@@ -6,9 +6,13 @@ Spec: `.scratch/rider-web-app/spec.md` (Further Notes)
 
 **Blocked by:** 06, 07
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Web app section with screenshot and `http://localhost:8080/`
-- [ ] Frontend dev instructions (`web/`, Vite dev server, proxy)
-- [ ] Architecture diagram updated
-- [ ] "What's next" drops the map; adds public hosting, cancellations, stops near me, route shapes
+- [x] Web app section with screenshot and `http://localhost:8080/`
+- [x] Frontend dev instructions (`web/`, Vite dev server, proxy)
+- [x] Architecture diagram updated
+- [x] "What's next" drops the map; adds public hosting, cancellations, stops near me, route shapes
+
+## Notes (2026-11-27)
+
+- Screenshot at `docs/images/rider-web-app.png`, taken from a live run on 2026-11-27.
