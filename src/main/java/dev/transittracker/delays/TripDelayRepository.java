@@ -1,6 +1,7 @@
 package dev.transittracker.delays;
 
 import java.sql.Timestamp;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -44,6 +45,17 @@ class TripDelayRepository {
 				ORDER BY delay_seconds DESC, trip_id
 				""")
 			.params(agencyId, routeId)
+			.query((rs, i) -> new TripDelay(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
+					rs.getInt(5), rs.getTimestamp(6).toInstant()))
+			.list();
+	}
+
+	List<TripDelay> forTrips(String agencyId, Collection<String> tripIds) {
+		return jdbc.sql("""
+				SELECT agency_id, trip_id, route_id, vehicle_id, delay_seconds, feed_timestamp
+				FROM trip_delay WHERE agency_id = ? AND trip_id = ANY (?)
+				""")
+			.params(agencyId, tripIds.toArray(String[]::new))
 			.query((rs, i) -> new TripDelay(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
 					rs.getInt(5), rs.getTimestamp(6).toInstant()))
 			.list();

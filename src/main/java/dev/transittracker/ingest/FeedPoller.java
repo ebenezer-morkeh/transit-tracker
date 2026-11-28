@@ -33,11 +33,14 @@ public class FeedPoller {
 
 	private final DelayService delays;
 
+	private final FeedStatus status;
+
 	private final List<Feed> feeds;
 
-	FeedPoller(VehicleService vehicles, DelayService delays, FeedProperties properties) {
+	FeedPoller(VehicleService vehicles, DelayService delays, FeedStatus status, FeedProperties properties) {
 		this.vehicles = vehicles;
 		this.delays = delays;
+		this.status = status;
 		this.feeds = properties.feeds();
 	}
 
@@ -63,6 +66,7 @@ public class FeedPoller {
 				tripPolls.add(poll(feed, feed.tripUpdatesUrl(), body -> {
 					List<TripPrediction> predictions = FeedParser.parseTripUpdates(body, feed.agencyId());
 					int saved = delays.replaceAgency(feed.agencyId(), predictions);
+					status.tripUpdatesSucceeded(feed.agencyId());
 					return "trips=" + predictions.size() + " delays=" + saved;
 				}));
 			}

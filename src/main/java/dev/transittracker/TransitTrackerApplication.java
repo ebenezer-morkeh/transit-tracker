@@ -3,8 +3,10 @@ package dev.transittracker;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.info.License;
+import java.time.Clock;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
 @OpenAPIDefinition(info = @Info(title = "Transit Tracker API", version = "v1",
@@ -12,6 +14,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 				+ "and GoCary, from their GTFS-realtime feeds.",
 		license = @License(name = "MIT")))
 public class TransitTrackerApplication {
+
+	/** The one clock; tests replace it to fix "now". */
+	@Bean
+	Clock clock() {
+		return Clock.systemUTC();
+	}
 
 	public static void main(String[] args) {
 		SpringApplication.run(TransitTrackerApplication.class, args);

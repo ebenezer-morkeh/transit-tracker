@@ -2,19 +2,15 @@ package dev.transittracker.delays;
 
 import dev.transittracker.ingest.TripPrediction;
 import dev.transittracker.schedule.ScheduledStopTime;
+import dev.transittracker.schedule.ServiceDay;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZoneId;
 import java.util.Optional;
 import java.util.function.Function;
 
 /** The delay rule (spec, Data model): pure, no I/O. */
 public final class TripDelays {
-
-	/** Every Triangle agency's {@code agency_timezone}. */
-	static final ZoneId ZONE = ZoneId.of("America/New_York");
 
 	private TripDelays() {
 	}
@@ -28,7 +24,7 @@ public final class TripDelays {
 		Integer delay = p.stopDelay();
 		if (delay == null && p.predictedTime() != null) {
 			LocalDate serviceDate = p.startDate() != null ? p.startDate()
-					: LocalDate.ofInstant(p.feedTimestamp(), ZONE);
+					: LocalDate.ofInstant(p.feedTimestamp(), ServiceDay.ZONE);
 			delay = schedule.apply(p)
 				.map(s -> scheduledSeconds(p, s))
 				.map(seconds -> secondsLate(serviceDate, seconds, p.predictedTime()))
@@ -50,15 +46,11 @@ public final class TripDelays {
 	}
 
 	/**
-	 * {@code predicted} minus the GTFS time {@code scheduledSeconds} (may exceed 24h) on {@code serviceDate}. GTFS
-	 * measures from noon minus 12h: local midnight, except on DST change days, where it keeps wall-clock times right.
+	 * {@code predicted} minus the GTFS time {@code scheduledSeconds} (may exceed 24h) on {@code serviceDate}; see
+	 * {@link ServiceDay#at}.
 	 */
 	public static int secondsLate(LocalDate serviceDate, int scheduledSeconds, Instant predicted) {
-		Instant scheduled = serviceDate.atTime(LocalTime.NOON)
-			.atZone(ZONE)
-			.minusHours(12)
-			.plusSeconds(scheduledSeconds)
-			.toInstant();
+		Instant scheduled = ServiceDay.at(serviceDate, scheduledSeconds);
 		return Math.toIntExact(predicted.getEpochSecond() - scheduled.getEpochSecond());
 	}
 
